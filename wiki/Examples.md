@@ -1,0 +1,521 @@
+# Examples
+
+Complete, runnable examples for common dungeon generation scenarios.
+
+## Simple Dungeon
+
+Minimal configuration for a basic dungeon:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 10,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+Console.WriteLine($"Generated {layout.Rooms.Count} rooms");
+```
+
+## Roguelike Dungeon
+
+Complete roguelike setup with boss, treasure, and shop:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Templates
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Spawn
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Boss
+    RoomTemplateBuilder<RoomType>.Rectangle(8, 8)
+        .WithId("boss-arena")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    // Combat (multiple sizes)
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("combat-small")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-medium")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-large")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Shop
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    // Treasure
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+// Constraints
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Shop constraints
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    
+    // Treasure constraints
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 3)
+};
+
+// Config
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 3)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.25f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+// Generate
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Output
+Console.WriteLine($"Generated {layout.Rooms.Count} rooms");
+Console.WriteLine($"Critical path: {string.Join(" -> ", layout.CriticalPath)}");
+Console.WriteLine($"Treasure rooms: {layout.Rooms.Count(r => r.RoomType == RoomType.Treasure)}");
+```
+
+## Linear Dungeon
+
+Minimal branching for a linear progression:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 8,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.0f,  // No branching - pure tree
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+## Highly Branched Dungeon
+
+Many loops and exploration paths:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 20,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.5f,  // Many loops
+    HallwayMode = HallwayMode.Always  // Maximum flexibility
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+## Custom Room Shapes
+
+Using L-shaped and custom templates:
+
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Standard rectangles
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-standard")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // L-shaped combat room
+    RoomTemplateBuilder<RoomType>.LShape(5, 4, 2, 2, Corner.TopRight)
+        .WithId("combat-l")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Custom cross-shaped treasure room
+    new RoomTemplateBuilder<RoomType>()
+        .WithId("treasure-cross")
+        .ForRoomTypes(RoomType.Treasure)
+        .AddCell(1, 0)  //   X
+        .AddCell(0, 1)  // X X X
+        .AddCell(1, 1)  //   X
+        .AddCell(2, 1)
+        .AddCell(1, 2)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Custom T-shaped room
+    new RoomTemplateBuilder<RoomType>()
+        .WithId("combat-t")
+        .ForRoomTypes(RoomType.Combat)
+        .AddRectangle(0, 0, 3, 1)  // Top bar
+        .AddRectangle(1, 1, 1, 2)  // Stem
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 12,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+## Multiple Floors
+
+Generate multiple floors with different seeds:
+
+```csharp
+var floorConfigs = new List<FloorConfig<RoomType>>();
+
+for (int floor = 1; floor <= 5; floor++)
+{
+    var config = new FloorConfig<RoomType>
+    {
+        Seed = 1000 + floor,  // Different seed per floor
+        RoomCount = 10 + floor * 2,  // Increasing difficulty
+        SpawnRoomType = RoomType.Spawn,
+        BossRoomType = RoomType.Boss,
+        DefaultRoomType = RoomType.Combat,
+        Templates = templates,
+        BranchingFactor = 0.2f + (floor * 0.05f),  // More complex each floor
+        HallwayMode = HallwayMode.AsNeeded
+    };
+    
+    floorConfigs.Add(config);
+}
+
+var generator = new FloorGenerator<RoomType>();
+var floors = floorConfigs.Select(c => generator.Generate(c)).ToList();
+
+Console.WriteLine($"Generated {floors.Count} floors");
+foreach (var floor in floors)
+{
+    Console.WriteLine($"Floor has {floor.Rooms.Count} rooms");
+}
+```
+
+## Rendering Example
+
+Complete example of rendering a dungeon:
+
+```csharp
+var layout = generator.Generate(config);
+
+// Get bounds for viewport
+var (min, max) = layout.GetBounds();
+int width = max.X - min.X + 1;
+int height = max.Y - min.Y + 1;
+
+// Create 2D array for rendering
+var tiles = new TileType[width, height];
+
+// Initialize to empty
+for (int x = 0; x < width; x++)
+{
+    for (int y = 0; y < height; y++)
+    {
+        tiles[x, y] = TileType.Empty;
+    }
+}
+
+// Render rooms
+foreach (var room in layout.Rooms)
+{
+    var tileType = room.RoomType switch
+    {
+        RoomType.Spawn => TileType.SpawnRoom,
+        RoomType.Boss => TileType.BossRoom,
+        RoomType.Combat => TileType.CombatRoom,
+        RoomType.Shop => TileType.ShopRoom,
+        RoomType.Treasure => TileType.TreasureRoom,
+        _ => TileType.Floor
+    };
+    
+    foreach (var cell in room.GetWorldCells())
+    {
+        int x = cell.X - min.X;
+        int y = cell.Y - min.Y;
+        tiles[x, y] = tileType;
+    }
+}
+
+// Render hallways
+foreach (var hallway in layout.Hallways)
+{
+    foreach (var segment in hallway.Segments)
+    {
+        foreach (var cell in segment.GetCells())
+        {
+            int x = cell.X - min.X;
+            int y = cell.Y - min.Y;
+            if (tiles[x, y] == TileType.Empty)
+            {
+                tiles[x, y] = TileType.Hallway;
+            }
+        }
+    }
+}
+
+// Render doors
+foreach (var door in layout.Doors)
+{
+    int x = door.Position.X - min.X;
+    int y = door.Position.Y - min.Y;
+    tiles[x, y] = TileType.Door;
+}
+
+// Print ASCII representation
+for (int y = 0; y < height; y++)
+{
+    for (int x = 0; x < width; x++)
+    {
+        char c = tiles[x, y] switch
+        {
+            TileType.SpawnRoom => 'S',
+            TileType.BossRoom => 'B',
+            TileType.CombatRoom => 'C',
+            TileType.ShopRoom => '$',
+            TileType.TreasureRoom => 'T',
+            TileType.Hallway => '.',
+            TileType.Door => 'D',
+            _ => ' '
+        };
+        Console.Write(c);
+    }
+    Console.WriteLine();
+}
+```
+
+## Game Integration Example
+
+Example of integrating with a game engine:
+
+```csharp
+public class DungeonManager
+{
+    private FloorLayout<RoomType> _layout;
+    private Dictionary<int, RoomEntity> _roomEntities = new();
+    
+    public void GenerateDungeon(int seed, int roomCount)
+    {
+        var config = CreateConfig(seed, roomCount);
+        var generator = new FloorGenerator<RoomType>();
+        _layout = generator.Generate(config);
+        
+        CreateRoomEntities();
+    }
+    
+    private void CreateRoomEntities()
+    {
+        foreach (var room in _layout.Rooms)
+        {
+            var entity = new RoomEntity
+            {
+                NodeId = room.NodeId,
+                RoomType = room.RoomType,
+                Position = new Vector2(
+                    room.Position.X * TileSize,
+                    room.Position.Y * TileSize
+                ),
+                Cells = room.GetWorldCells().ToList()
+            };
+            
+            _roomEntities[room.NodeId] = entity;
+        }
+    }
+    
+    public RoomEntity GetRoom(int nodeId)
+    {
+        return _roomEntities[nodeId];
+    }
+    
+    public IEnumerable<RoomEntity> GetConnectedRooms(int nodeId)
+    {
+        // Find all rooms connected to this one via doors/hallways
+        var connected = new List<RoomEntity>();
+        
+        foreach (var door in _layout.Doors)
+        {
+            if (door.ConnectsToRoomId == nodeId)
+            {
+                // Find room this door belongs to
+                var room = _layout.Rooms.FirstOrDefault(r => 
+                    r.GetWorldCells().Contains(door.Position));
+                if (room != null)
+                {
+                    connected.Add(_roomEntities[room.NodeId]);
+                }
+            }
+        }
+        
+        return connected;
+    }
+    
+    public bool IsOnCriticalPath(int nodeId)
+    {
+        return _layout.CriticalPath.Contains(nodeId);
+    }
+}
+```
+
+## Testing Example
+
+Example of testing dungeon generation:
+
+```csharp
+[Fact]
+public void Generate_ValidConfig_ProducesValidDungeon()
+{
+    var config = CreateTestConfig();
+    var generator = new FloorGenerator<RoomType>();
+    
+    var layout = generator.Generate(config);
+    
+    // Assertions
+    Assert.NotNull(layout);
+    Assert.Equal(config.RoomCount, layout.Rooms.Count);
+    Assert.Equal(config.SpawnRoomType, 
+        layout.GetRoom(layout.SpawnRoomId).RoomType);
+    Assert.Equal(config.BossRoomType, 
+        layout.GetRoom(layout.BossRoomId).RoomType);
+    
+    // Critical path is valid
+    Assert.NotEmpty(layout.CriticalPath);
+    Assert.Equal(layout.SpawnRoomId, layout.CriticalPath[0]);
+    Assert.Equal(layout.BossRoomId, layout.CriticalPath[^1]);
+    
+    // Required rooms exist
+    var treasureCount = layout.Rooms.Count(r => r.RoomType == RoomType.Treasure);
+    Assert.Equal(2, treasureCount);
+}
+
+[Fact]
+public void Generate_SameSeed_SameOutput()
+{
+    var config1 = CreateTestConfig(seed: 12345);
+    var config2 = CreateTestConfig(seed: 12345);
+    
+    var generator = new FloorGenerator<RoomType>();
+    var layout1 = generator.Generate(config1);
+    var layout2 = generator.Generate(config2);
+    
+    Assert.Equal(layout1.Rooms.Count, layout2.Rooms.Count);
+    Assert.Equal(layout1.SpawnRoomId, layout2.SpawnRoomId);
+    Assert.Equal(layout1.BossRoomId, layout2.BossRoomId);
+}
+```
+
+## Next Steps
+
+- **[Getting Started](Getting-Started)** - Learn the basics
+- **[Room Templates](Room-Templates)** - Create custom shapes
+- **[Constraints](Constraints)** - Control room placement
+- **[Working with Output](Working-with-Output)** - Use generated layouts
+
