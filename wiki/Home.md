@@ -2,6 +2,8 @@
 
 Welcome to the ShepherdProceduralDungeons wiki! This library helps you generate procedural dungeon floors for roguelike and dungeon crawler games.
 
+> **Note:** This wiki is automatically synced from the main repository. See the [GitHub repository](https://github.com/JohnVonDrashek/shepherd-procedural-dungeons) for the source.
+
 ## What This Library Does
 
 ShepherdProceduralDungeons generates:
