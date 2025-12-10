@@ -273,8 +273,8 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
 
         openSet.Enqueue(start, ManhattanDistance(start, end));
         
-#if DEBUG
         int nodesExplored = 0;
+#if DEBUG
         int lastReport = 0;
         Console.WriteLine($"[DEBUG] A* initialized: openSet.Count={openSet.Count}, startPriority={ManhattanDistance(start, end)}");
 #endif
