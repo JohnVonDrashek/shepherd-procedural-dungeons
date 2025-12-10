@@ -1,0 +1,55 @@
+name: Publish Wiki
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/publish-wiki.yml'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone wiki repository
+        run: |
+          git clone https://github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git wiki-repo
+
+      - name: Sync wiki files
+        run: |
+          # Copy all wiki files to the wiki repository
+          rsync -av --delete --exclude='.git' wiki/ wiki-repo/
+          
+          # Ensure Home.md exists (required for GitHub wikis)
+          if [ ! -f "wiki-repo/Home.md" ]; then
+            echo "Warning: Home.md not found in wiki directory"
+          fi
+
+      - name: Commit and push to wiki
+        env:
+          # Use PAT if available, otherwise fall back to GITHUB_TOKEN
+          # Note: GITHUB_TOKEN may not have wiki write access - use GH_PAT secret if needed
+          WIKI_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          cd wiki-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Automated wiki update from main branch [skip ci]"
+            git push https://x-access-token:${WIKI_TOKEN}@github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git HEAD:main
+          else
+            echo "No changes to commit"
+          fi
+
