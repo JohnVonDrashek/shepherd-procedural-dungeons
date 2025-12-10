@@ -1,6 +1,11 @@
 # ShepherdProceduralDungeons
 
-<img src="src/ShepherdProceduralDungeons/icon.png" alt="ShepherdProceduralDungeons Icon" width="128" height="128" align="right">
+![NuGet](https://img.shields.io/nuget/v/ShepherdProceduralDungeons?logo=nuget)
+![License](https://img.shields.io/github/license/JohnVonDrashek/shepherd-procedural-dungeons)
+![.NET](https://img.shields.io/badge/.NET-10.0-blue)
+
+![ShepherdProceduralDungeons](src/ShepherdProceduralDungeons/icon.png)
+
 
 A .NET 10.0 library for procedural dungeon generation targeting roguelike/dungeon crawler games. Produces graph topology and spatial layouts; rendering is the game's responsibility.
 
@@ -17,6 +22,14 @@ A .NET 10.0 library for procedural dungeon generation targeting roguelike/dungeo
 
 ```bash
 dotnet add package ShepherdProceduralDungeons
+```
+
+Or add to your `.csproj`:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="ShepherdProceduralDungeons" Version="1.0.1" />
+</ItemGroup>
 ```
 
 Or install from source by referencing the project.

@@ -8,12 +8,13 @@
 
     <!-- NuGet package info -->
     <PackageId>ShepherdProceduralDungeons</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Shepherd</Authors>
     <Description>Procedural dungeon generation library for roguelike games</Description>
     <PackageTags>procedural;dungeon;roguelike;gamedev;monogame</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <!-- Documentation -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -21,6 +22,7 @@
 
   <ItemGroup>
     <None Include="icon.png" Pack="true" PackagePath="\"/>
+    <None Include="../../README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
 </Project>
