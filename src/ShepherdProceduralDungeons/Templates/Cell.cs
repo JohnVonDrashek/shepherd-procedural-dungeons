@@ -22,4 +22,10 @@ public readonly record struct Cell(int X, int Y)
 
     /// <summary>Gets the cell directly west (X-1) of this cell.</summary>
     public Cell West => new(X - 1, Y);
+
+    /// <summary>
+    /// Returns a string representation of this cell.
+    /// Overridden to prevent recursion when IDE introspects directional properties.
+    /// </summary>
+    public override string ToString() => $"Cell({X}, {Y})";
 }

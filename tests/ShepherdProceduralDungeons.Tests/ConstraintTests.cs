@@ -14,11 +14,14 @@ public class ConstraintTests
         var graph = CreateSimpleGraph();
         var assignments = new Dictionary<int, TestHelpers.RoomType>();
 
-        var node1 = graph.GetNode(0); // Distance 0
-        var node4 = graph.GetNode(3); // Distance 3
+        var startNode = graph.GetNode(0); // Distance 0
+        // Find a node with distance >= 3, or use the farthest node
+        var nodeWithDistance3OrMore = graph.Nodes
+            .Where(n => n.DistanceFromStart >= 3)
+            .FirstOrDefault() ?? graph.Nodes.OrderByDescending(n => n.DistanceFromStart).First();
 
-        Assert.False(constraint.IsValid(node1, graph, assignments));
-        Assert.True(constraint.IsValid(node4, graph, assignments));
+        Assert.False(constraint.IsValid(startNode, graph, assignments));
+        Assert.True(constraint.IsValid(nodeWithDistance3OrMore, graph, assignments));
     }
 
     [Fact]

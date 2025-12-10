@@ -32,6 +32,15 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         var startRoom = PlaceRoom(startNode.Id, startTemplate, new Cell(0, 0), assignments[startNode.Id]);
         placedRooms[startNode.Id] = startRoom;
         AddOccupiedCells(startRoom, occupiedCells);
+        
+#if DEBUG
+        DungeonDebugVisualizer.PrintRoomPlacement(
+            startNode.Id, 
+            assignments[startNode.Id], 
+            startRoom, 
+            placedRooms.Count);
+        Console.WriteLine($"[DEBUG]   Placement: START ROOM at origin");
+#endif
 
         // 2. BFS from start, placing connected rooms
         var queue = new Queue<int>();
@@ -60,6 +69,15 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                     var neighborRoom = PlaceRoom(neighborId, neighborTemplate, placement.Value, assignments[neighborId]);
                     placedRooms[neighborId] = neighborRoom;
                     AddOccupiedCells(neighborRoom, occupiedCells);
+                    
+#if DEBUG
+                    DungeonDebugVisualizer.PrintRoomPlacement(
+                        neighborId, 
+                        assignments[neighborId], 
+                        neighborRoom, 
+                        placedRooms.Count);
+                    Console.WriteLine($"[DEBUG]   Placement: ADJACENT to room {currentId}");
+#endif
                 }
                 else if (hallwayMode != HallwayMode.None)
                 {
@@ -72,6 +90,16 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                     // Mark connection for hallway generation
                     conn.RequiresHallway = true;
                     hallwayConnections.Add((Math.Min(currentId, neighborId), Math.Max(currentId, neighborId)));
+                    
+#if DEBUG
+                    DungeonDebugVisualizer.PrintRoomPlacement(
+                        neighborId, 
+                        assignments[neighborId], 
+                        neighborRoom, 
+                        placedRooms.Count);
+                    Console.WriteLine($"[DEBUG]   Placement: NEARBY (hallway required) to room {currentId}");
+                    Console.WriteLine($"[DEBUG]   Distance from room {currentId}: anchor={nearbyPlacement}, current room anchor={currentRoom.Position}");
+#endif
                 }
                 else
                 {
@@ -90,6 +118,11 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 conn.RequiresHallway = true;
             }
         }
+
+#if DEBUG
+        DungeonDebugVisualizer.PrintSpatialLayout(placedRooms.Values.ToList(), "After Room Placement");
+        Console.WriteLine(DungeonDebugVisualizer.CreateAsciiMap(placedRooms.Values.ToList(), occupiedCells));
+#endif
 
         return placedRooms.Values.ToList();
     }

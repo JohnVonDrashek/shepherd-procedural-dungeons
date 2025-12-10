@@ -8,7 +8,7 @@
 
     <!-- NuGet package info -->
     <PackageId>ShepherdProceduralDungeons</PackageId>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>Shepherd</Authors>
     <Description>Procedural dungeon generation library for roguelike games</Description>
     <PackageTags>procedural;dungeon;roguelike;gamedev;monogame</PackageTags>
