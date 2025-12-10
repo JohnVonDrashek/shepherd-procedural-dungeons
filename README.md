@@ -1,5 +1,7 @@
 # ShepherdProceduralDungeons
 
+<img src="src/ShepherdProceduralDungeons/icon.png" alt="ShepherdProceduralDungeons Icon" width="128" height="128" align="right">
+
 A .NET 10.0 library for procedural dungeon generation targeting roguelike/dungeon crawler games. Produces graph topology and spatial layouts; rendering is the game's responsibility.
 
 ## Features

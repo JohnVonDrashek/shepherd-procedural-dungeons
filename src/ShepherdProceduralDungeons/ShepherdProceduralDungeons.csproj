@@ -13,9 +13,14 @@
     <Description>Procedural dungeon generation library for roguelike games</Description>
     <PackageTags>procedural;dungeon;roguelike;gamedev;monogame</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
 
     <!-- Documentation -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="icon.png" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 
 </Project>
