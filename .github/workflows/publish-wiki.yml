@@ -22,7 +22,21 @@ jobs:
 
       - name: Clone wiki repository
         run: |
-          git clone https://github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git wiki-repo
+          # Clone wiki repo (create directory if it doesn't exist)
+          if [ ! -d "wiki-repo" ]; then
+            git clone https://github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git wiki-repo || {
+              echo "Wiki repository might be empty, initializing..."
+              mkdir -p wiki-repo
+              cd wiki-repo
+              git init
+              git remote add origin https://github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git
+              cd ..
+            }
+          else
+            cd wiki-repo
+            git pull origin main || git pull origin master || true
+            cd ..
+          fi
 
       - name: Sync wiki files
         run: |
@@ -44,11 +58,31 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Check if this is a new repo (no remote or no commits)
+          if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+            echo "Initializing new wiki repository"
+            git checkout -b main 2>/dev/null || git checkout -b master 2>/dev/null || true
+          fi
+          
           # Check if there are changes
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "Automated wiki update from main branch [skip ci]"
-            git push https://x-access-token:${WIKI_TOKEN}@github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git HEAD:main
+            
+            # Try pushing to main, fall back to master
+            if git push https://x-access-token:${WIKI_TOKEN}@github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git HEAD:main 2>&1; then
+              echo "Pushed to main branch"
+            elif git push https://x-access-token:${WIKI_TOKEN}@github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git HEAD:master 2>&1; then
+              echo "Pushed to master branch"
+            elif git push -u https://x-access-token:${WIKI_TOKEN}@github.com/JohnVonDrashek/shepherd-procedural-dungeons.wiki.git HEAD:main 2>&1; then
+              echo "Pushed to main branch (new branch)"
+            else
+              echo "ERROR: Failed to push to wiki repository"
+              echo "This might be due to insufficient permissions."
+              echo "GITHUB_TOKEN may not have wiki write access."
+              echo "Please set up a GH_PAT secret with 'repo' scope."
+              exit 1
+            fi
           else
             echo "No changes to commit"
           fi
