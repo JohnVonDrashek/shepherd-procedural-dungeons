@@ -51,6 +51,7 @@ bld/
 *.snupkg
 *.nuspec
 packages/
+artifacts/
 
 ## Test results
 [Tt]est[Rr]esult*/
