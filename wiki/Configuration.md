@@ -190,6 +190,160 @@ Spawn -> Room1 -> Room2 -> Room3 -> Boss
          └-> Room5 -> Room3 (loop back)
 ```
 
+### GraphAlgorithm
+
+```csharp
+GraphAlgorithm = GraphAlgorithm.GridBased
+```
+
+**Type:** `GraphAlgorithm` enum
+
+**Default:** `GraphAlgorithm.SpanningTree` (backward compatible)
+
+**Description:** Algorithm used for generating the dungeon floor graph topology. Different algorithms produce fundamentally different connectivity patterns and gameplay experiences.
+
+**Available Algorithms:**
+
+- **`SpanningTree`** (default) - Classic spanning tree algorithm with optional extra connections. Produces organic, branching structures. Backward compatible with existing behavior.
+- **`GridBased`** - Arranges rooms in a 2D grid pattern with configurable connectivity. Creates structured, maze-like dungeons with clear navigation patterns.
+- **`CellularAutomata`** - Uses cellular automata rules to generate organic, cave-like structures with irregular connectivity.
+- **`MazeBased`** - Generates maze-like structures with complex, winding paths perfect for exploration-focused games.
+- **`HubAndSpoke`** - Creates central hub rooms with branching spokes. Good for creating gathering/rest areas.
+
+**Algorithm-Specific Configuration:**
+
+Each algorithm (except `SpanningTree`) requires its own configuration object:
+
+#### GridBasedGraphConfig
+
+Required when `GraphAlgorithm` is `GridBased`:
+
+```csharp
+GraphAlgorithm = GraphAlgorithm.GridBased,
+GridBasedConfig = new GridBasedGraphConfig
+{
+    GridWidth = 4,   // Width of the grid
+    GridHeight = 4,  // Height of the grid (GridWidth * GridHeight should be >= RoomCount)
+    ConnectivityPattern = ConnectivityPattern.FourWay  // or EightWay
+}
+```
+
+**Properties:**
+- `GridWidth` (int, required) - Width of the grid
+- `GridHeight` (int, required) - Height of the grid
+- `ConnectivityPattern` (ConnectivityPattern, default: `FourWay`) - How rooms connect:
+  - `FourWay` - Connect to north, south, east, west neighbors
+  - `EightWay` - Connect to all 8 neighbors (includes diagonals)
+
+**Tips:**
+- `GridWidth * GridHeight` should be >= `RoomCount` to fit all rooms
+- `FourWay` creates more structured, maze-like layouts
+- `EightWay` creates more connected, open layouts
+
+#### CellularAutomataGraphConfig
+
+Required when `GraphAlgorithm` is `CellularAutomata`:
+
+```csharp
+GraphAlgorithm = GraphAlgorithm.CellularAutomata,
+CellularAutomataConfig = new CellularAutomataGraphConfig
+{
+    BirthThreshold = 4,      // Default: 4
+    SurvivalThreshold = 3,   // Default: 3
+    Iterations = 5           // Default: 5
+}
+```
+
+**Properties:**
+- `BirthThreshold` (int, default: 4) - Minimum neighbors required for a cell to become alive
+- `SurvivalThreshold` (int, default: 3) - Minimum neighbors required for a cell to stay alive
+- `Iterations` (int, default: 5) - Number of cellular automata iterations
+
+**Tips:**
+- Higher `BirthThreshold` = sparser, more cave-like structures
+- Higher `SurvivalThreshold` = more isolated rooms
+- More `Iterations` = smoother, more organic shapes
+
+#### MazeBasedGraphConfig
+
+Required when `GraphAlgorithm` is `MazeBased`:
+
+```csharp
+GraphAlgorithm = GraphAlgorithm.MazeBased,
+MazeBasedConfig = new MazeBasedGraphConfig
+{
+    MazeType = MazeType.Perfect,    // or Imperfect
+    Algorithm = MazeAlgorithm.Prims  // or Kruskals
+}
+```
+
+**Properties:**
+- `MazeType` (MazeType, default: `Perfect`) - Type of maze:
+  - `Perfect` - No loops, tree structure (single path between any two rooms)
+  - `Imperfect` - May contain loops
+- `Algorithm` (MazeAlgorithm, default: `Prims`) - Algorithm to use:
+  - `Prims` - Prim's algorithm (grows from a single point)
+  - `Kruskals` - Kruskal's algorithm (connects disjoint sets)
+
+**Tips:**
+- `Perfect` mazes create linear, exploration-focused experiences
+- `Imperfect` mazes allow loops and alternative routes
+- Both algorithms produce similar results; choose based on preference
+
+#### HubAndSpokeGraphConfig
+
+Required when `GraphAlgorithm` is `HubAndSpoke`:
+
+```csharp
+GraphAlgorithm = GraphAlgorithm.HubAndSpoke,
+HubAndSpokeConfig = new HubAndSpokeGraphConfig
+{
+    HubCount = 2,        // Number of hub rooms
+    MaxSpokeLength = 3    // Maximum length of spokes from hubs
+}
+```
+
+**Properties:**
+- `HubCount` (int, required) - Number of central hub rooms to create
+- `MaxSpokeLength` (int, required) - Maximum length of spokes branching from hubs
+
+**Tips:**
+- Hub rooms typically have many connections (good for shops, rest areas)
+- Spoke rooms branch from hubs (good for exploration paths)
+- `HubCount * MaxSpokeLength` should be considered when setting `RoomCount`
+
+**Example:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    GraphAlgorithm = GraphAlgorithm.GridBased,
+    GridBasedConfig = new GridBasedGraphConfig
+    {
+        GridWidth = 5,
+        GridHeight = 5,
+        ConnectivityPattern = ConnectivityPattern.FourWay
+    }
+};
+```
+
+**Determinism:**
+
+All algorithms maintain determinism - same seed + same algorithm + same config = identical graph topology.
+
+**Backward Compatibility:**
+
+The default algorithm (`SpanningTree`) maintains backward compatibility. Existing configurations without `GraphAlgorithm` specified will use the original spanning tree algorithm.
+
+**Choosing an Algorithm:**
+
+- **SpanningTree** - Default, organic branching (good for most roguelikes)
+- **GridBased** - Structured, maze-like (good for puzzle games, structured exploration)
+- **CellularAutomata** - Organic, cave-like (good for cave systems, irregular dungeons)
+- **MazeBased** - Complex, winding paths (good for exploration-focused games)
+- **HubAndSpoke** - Central gathering areas (good for hub-based progression)
+
 ### HallwayMode
 
 ```csharp

@@ -81,17 +81,89 @@ The **graph** represents which rooms connect to which. It's a mathematical struc
 - **Start Node** - Always node 0 (spawn)
 - **Boss Node** - Determined during type assignment
 
-### Generation
+### Graph Generation Algorithms
 
-The graph is generated as:
-1. A **spanning tree** (guarantees all rooms are reachable)
-2. Plus **extra edges** based on `BranchingFactor`
+The library supports multiple graph generation algorithms, each producing different connectivity patterns:
 
-### Branching Factor
+#### SpanningTree (Default)
 
+The classic algorithm that:
+1. Creates a **spanning tree** (guarantees all rooms are reachable)
+2. Adds **extra edges** based on `BranchingFactor`
+
+**Characteristics:**
+- Organic, branching structures
+- Good for most roguelikes
+- Backward compatible (default)
+
+**Branching Factor:**
 - **0.0** - Pure tree (no loops, linear)
 - **0.3** - Some loops (recommended)
 - **1.0** - Highly connected (many loops)
+
+#### GridBased
+
+Arranges rooms in a 2D grid pattern with configurable connectivity.
+
+**Characteristics:**
+- Structured, maze-like layouts
+- Clear navigation patterns
+- Good for puzzle games and structured exploration
+
+**Configuration:**
+- `GridWidth` and `GridHeight` define grid dimensions
+- `ConnectivityPattern` controls connections (FourWay or EightWay)
+
+#### CellularAutomata
+
+Uses cellular automata rules to generate organic, cave-like structures.
+
+**Characteristics:**
+- Irregular, organic connectivity
+- Cave-like topologies
+- Good for cave systems and irregular dungeons
+
+**Configuration:**
+- `BirthThreshold` and `SurvivalThreshold` control density
+- `Iterations` controls smoothness
+
+#### MazeBased
+
+Generates maze-like structures with complex, winding paths.
+
+**Characteristics:**
+- Complex, winding paths
+- Perfect or imperfect mazes
+- Good for exploration-focused games
+
+**Configuration:**
+- `MazeType` (Perfect or Imperfect)
+- `Algorithm` (Prims or Kruskals)
+
+#### HubAndSpoke
+
+Creates central hub rooms with branching spokes.
+
+**Characteristics:**
+- Central gathering areas
+- Branching exploration paths
+- Good for hub-based progression
+
+**Configuration:**
+- `HubCount` - Number of hub rooms
+- `MaxSpokeLength` - Maximum spoke length
+
+### Choosing an Algorithm
+
+- **SpanningTree** - Default, organic branching (good for most roguelikes)
+- **GridBased** - Structured, maze-like (good for puzzle games)
+- **CellularAutomata** - Organic, cave-like (good for cave systems)
+- **MazeBased** - Complex, winding paths (good for exploration games)
+- **HubAndSpoke** - Central gathering areas (good for hub-based progression)
+
+### Determinism
+
+All algorithms maintain determinism - same seed + same algorithm + same config = identical graph topology.
 
 ## Constraints
 

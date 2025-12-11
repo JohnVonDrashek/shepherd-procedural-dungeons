@@ -75,8 +75,30 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         var hallwayRng = new Random(hallwaySeed);
 
         // 1. Generate graph
-        var graphGenerator = new GraphGenerator();
-        var graph = graphGenerator.Generate(config.RoomCount, config.BranchingFactor, graphRng);
+        var graphGenerator = CreateGraphGenerator(config);
+        FloorGraph graph;
+        
+        if (config.GraphAlgorithm == GraphAlgorithm.GridBased && config.GridBasedConfig != null)
+        {
+            graph = ((GridBasedGraphGenerator)graphGenerator).Generate(config.RoomCount, config.BranchingFactor, graphRng, config.GridBasedConfig);
+        }
+        else if (config.GraphAlgorithm == GraphAlgorithm.CellularAutomata && config.CellularAutomataConfig != null)
+        {
+            graph = ((CellularAutomataGraphGenerator)graphGenerator).Generate(config.RoomCount, config.BranchingFactor, graphRng, config.CellularAutomataConfig);
+        }
+        else if (config.GraphAlgorithm == GraphAlgorithm.MazeBased && config.MazeBasedConfig != null)
+        {
+            graph = ((MazeBasedGraphGenerator)graphGenerator).Generate(config.RoomCount, config.BranchingFactor, graphRng, config.MazeBasedConfig);
+        }
+        else if (config.GraphAlgorithm == GraphAlgorithm.HubAndSpoke && config.HubAndSpokeConfig != null)
+        {
+            graph = ((HubAndSpokeGraphGenerator)graphGenerator).Generate(config.RoomCount, config.BranchingFactor, graphRng, config.HubAndSpokeConfig);
+        }
+        else
+        {
+            // Default: SpanningTree or fallback
+            graph = graphGenerator.Generate(config.RoomCount, config.BranchingFactor, graphRng);
+        }
 
         // 2. Prepare zone data structures (but don't assign zones yet - need critical path first)
         Dictionary<int, string>? zoneAssignments = null;
@@ -221,6 +243,19 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             ZoneAssignments = zoneAssignments,
             TransitionRooms = transitionRooms,
             SecretPassages = secretPassages
+        };
+    }
+
+    private IGraphGenerator CreateGraphGenerator(FloorConfig<TRoomType> config)
+    {
+        return config.GraphAlgorithm switch
+        {
+            GraphAlgorithm.SpanningTree => new SpanningTreeGraphGenerator(),
+            GraphAlgorithm.GridBased => new GridBasedGraphGenerator(),
+            GraphAlgorithm.CellularAutomata => new CellularAutomataGraphGenerator(),
+            GraphAlgorithm.MazeBased => new MazeBasedGraphGenerator(),
+            GraphAlgorithm.HubAndSpoke => new HubAndSpokeGraphGenerator(),
+            _ => new SpanningTreeGraphGenerator() // Default fallback
         };
     }
 

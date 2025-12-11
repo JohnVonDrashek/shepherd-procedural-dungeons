@@ -147,6 +147,11 @@ public required IReadOnlyList<RoomTemplate<TRoomType>> Templates { get; init; }
 public IReadOnlyList<(TRoomType Type, int Count)> RoomRequirements { get; init; }
 public IReadOnlyList<IConstraint<TRoomType>> Constraints { get; init; }
 public float BranchingFactor { get; init; }  // Default: 0.3f
+public GraphAlgorithm GraphAlgorithm { get; init; }  // Default: GraphAlgorithm.SpanningTree
+public GridBasedGraphConfig? GridBasedConfig { get; init; }  // Required when GraphAlgorithm is GridBased
+public CellularAutomataGraphConfig? CellularAutomataConfig { get; init; }  // Required when GraphAlgorithm is CellularAutomata
+public MazeBasedGraphConfig? MazeBasedConfig { get; init; }  // Required when GraphAlgorithm is MazeBased
+public HubAndSpokeGraphConfig? HubAndSpokeConfig { get; init; }  // Required when GraphAlgorithm is HubAndSpoke
 public HallwayMode HallwayMode { get; init; }  // Default: HallwayMode.AsNeeded
 public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }  // Optional zones
 public SecretPassageConfig<TRoomType>? SecretPassageConfig { get; init; }  // Optional secret passages
@@ -670,6 +675,130 @@ public enum Edge
 ```csharp
 public static Edge Opposite(this Edge edge)
 ```
+
+## GraphAlgorithm
+
+Algorithm used for generating the dungeon floor graph topology.
+
+### Values
+
+```csharp
+public enum GraphAlgorithm
+{
+    SpanningTree,      // Default spanning tree algorithm (backward compatible)
+    GridBased,         // Grid-based algorithm
+    CellularAutomata,  // Cellular automata algorithm
+    MazeBased,         // Maze-based algorithm
+    HubAndSpoke        // Hub-and-spoke algorithm
+}
+```
+
+## GridBasedGraphConfig
+
+Configuration for grid-based graph generation.
+
+### Properties
+
+```csharp
+public required int GridWidth { get; init; }
+public required int GridHeight { get; init; }
+public ConnectivityPattern ConnectivityPattern { get; init; }  // Default: ConnectivityPattern.FourWay
+```
+
+## ConnectivityPattern
+
+Connectivity pattern for grid-based graph generation.
+
+### Values
+
+```csharp
+public enum ConnectivityPattern
+{
+    FourWay,   // Four-way connectivity (north, south, east, west)
+    EightWay   // Eight-way connectivity (includes diagonals)
+}
+```
+
+## CellularAutomataGraphConfig
+
+Configuration for cellular automata graph generation.
+
+### Properties
+
+```csharp
+public int BirthThreshold { get; init; }  // Default: 4
+public int SurvivalThreshold { get; init; }  // Default: 3
+public int Iterations { get; init; }  // Default: 5
+```
+
+## MazeBasedGraphConfig
+
+Configuration for maze-based graph generation.
+
+### Properties
+
+```csharp
+public MazeType MazeType { get; init; }  // Default: MazeType.Perfect
+public MazeAlgorithm Algorithm { get; init; }  // Default: MazeAlgorithm.Prims
+```
+
+## MazeType
+
+Type of maze to generate.
+
+### Values
+
+```csharp
+public enum MazeType
+{
+    Perfect,    // Perfect maze (no loops, tree structure)
+    Imperfect   // Imperfect maze (may contain loops)
+}
+```
+
+## MazeAlgorithm
+
+Algorithm used for maze generation.
+
+### Values
+
+```csharp
+public enum MazeAlgorithm
+{
+    Prims,      // Prim's algorithm
+    Kruskals    // Kruskal's algorithm
+}
+```
+
+## HubAndSpokeGraphConfig
+
+Configuration for hub-and-spoke graph generation.
+
+### Properties
+
+```csharp
+public required int HubCount { get; init; }
+public required int MaxSpokeLength { get; init; }
+```
+
+## IGraphGenerator
+
+Interface for graph generation algorithms.
+
+### Methods
+
+```csharp
+FloorGraph Generate(int roomCount, float branchingFactor, Random rng)
+```
+
+Generates a connected graph with the specified number of nodes.
+
+**Parameters:**
+- `roomCount` - Number of rooms to generate
+- `branchingFactor` - 0.0 = tree only, 1.0 = highly connected with loops
+- `rng` - Random number generator for deterministic generation
+
+**Returns:** `FloorGraph` - A connected floor graph
 
 ## HallwayMode
 

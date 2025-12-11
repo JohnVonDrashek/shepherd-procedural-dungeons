@@ -68,5 +68,30 @@ public sealed class FloorConfig<TRoomType> where TRoomType : Enum
     /// Configuration for secret passage generation.
     /// </summary>
     public SecretPassageConfig<TRoomType>? SecretPassageConfig { get; init; }
+
+    /// <summary>
+    /// Graph generation algorithm to use. Defaults to SpanningTree for backward compatibility.
+    /// </summary>
+    public GraphAlgorithm GraphAlgorithm { get; init; } = GraphAlgorithm.SpanningTree;
+
+    /// <summary>
+    /// Configuration for grid-based graph generation. Required when GraphAlgorithm is GridBased.
+    /// </summary>
+    public GridBasedGraphConfig? GridBasedConfig { get; init; }
+
+    /// <summary>
+    /// Configuration for cellular automata graph generation. Required when GraphAlgorithm is CellularAutomata.
+    /// </summary>
+    public CellularAutomataGraphConfig? CellularAutomataConfig { get; init; }
+
+    /// <summary>
+    /// Configuration for maze-based graph generation. Required when GraphAlgorithm is MazeBased.
+    /// </summary>
+    public MazeBasedGraphConfig? MazeBasedConfig { get; init; }
+
+    /// <summary>
+    /// Configuration for hub-and-spoke graph generation. Required when GraphAlgorithm is HubAndSpoke.
+    /// </summary>
+    public HubAndSpokeGraphConfig? HubAndSpokeConfig { get; init; }
 }
 

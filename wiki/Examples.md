@@ -2174,6 +2174,260 @@ var generator = new FloorGenerator<RoomType>();
 var layout = generator.Generate(config);
 ```
 
+## Graph Generation Algorithms
+
+The library supports multiple graph generation algorithms, each producing different connectivity patterns. Here are examples for each algorithm:
+
+### Grid-Based Algorithm
+
+Creates structured, maze-like dungeons with rooms arranged in a grid:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Templates;
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 16,  // 4x4 grid
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.GridBased,
+    GridBasedConfig = new GridBasedGraphConfig
+    {
+        GridWidth = 4,
+        GridHeight = 4,
+        ConnectivityPattern = ConnectivityPattern.FourWay  // Structured connections
+    },
+    BranchingFactor = 0.2f  // Lower branching for more structured layout
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+**Use Cases:**
+- Puzzle games requiring structured navigation
+- Maze-like exploration
+- Grid-based gameplay mechanics
+
+### Cellular Automata Algorithm
+
+Creates organic, cave-like structures with irregular connectivity:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 20,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.CellularAutomata,
+    CellularAutomataConfig = new CellularAutomataGraphConfig
+    {
+        BirthThreshold = 4,      // Controls density
+        SurvivalThreshold = 3,   // Controls connectivity
+        Iterations = 5           // More iterations = smoother shapes
+    },
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+**Use Cases:**
+- Cave systems
+- Organic, irregular dungeons
+- Natural-feeling layouts
+
+### Maze-Based Algorithm
+
+Creates complex, winding path structures perfect for exploration:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 25,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.MazeBased,
+    MazeBasedConfig = new MazeBasedGraphConfig
+    {
+        MazeType = MazeType.Perfect,    // No loops, single path
+        Algorithm = MazeAlgorithm.Prims // Prim's algorithm
+    },
+    BranchingFactor = 0.1f  // Low branching for maze-like feel
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+**Imperfect Maze Example:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    GraphAlgorithm = GraphAlgorithm.MazeBased,
+    MazeBasedConfig = new MazeBasedGraphConfig
+    {
+        MazeType = MazeType.Imperfect,  // Allows loops
+        Algorithm = MazeAlgorithm.Kruskals
+    },
+    BranchingFactor = 0.4f  // Higher branching for more loops
+};
+```
+
+**Use Cases:**
+- Exploration-focused games
+- Complex navigation challenges
+- Winding, maze-like experiences
+
+### Hub-and-Spoke Algorithm
+
+Creates central hub rooms with branching spokes:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.HubAndSpoke,
+    HubAndSpokeConfig = new HubAndSpokeGraphConfig
+    {
+        HubCount = 2,        // Two central hub rooms
+        MaxSpokeLength = 3    // Spokes branch up to 3 rooms from hubs
+    },
+    BranchingFactor = 0.2f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+**Use Cases:**
+- Hub-based progression
+- Central gathering/rest areas
+- Spoke-based exploration paths
+
+### Comparing Algorithms
+
+Here's how to generate the same dungeon with different algorithms:
+
+```csharp
+var baseConfig = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 16,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates
+};
+
+// Spanning tree (default)
+var spanningTreeConfig = baseConfig with
+{
+    GraphAlgorithm = GraphAlgorithm.SpanningTree
+    // No algorithm-specific config needed
+};
+
+// Grid-based
+var gridConfig = baseConfig with
+{
+    GraphAlgorithm = GraphAlgorithm.GridBased,
+    GridBasedConfig = new GridBasedGraphConfig
+    {
+        GridWidth = 4,
+        GridHeight = 4,
+        ConnectivityPattern = ConnectivityPattern.FourWay
+    }
+};
+
+// Cellular automata
+var caConfig = baseConfig with
+{
+    GraphAlgorithm = GraphAlgorithm.CellularAutomata,
+    CellularAutomataConfig = new CellularAutomataGraphConfig
+    {
+        BirthThreshold = 4,
+        SurvivalThreshold = 3,
+        Iterations = 5
+    }
+};
+
+// Generate with each algorithm
+var generator = new FloorGenerator<RoomType>();
+var spanningTreeLayout = generator.Generate(spanningTreeConfig);
+var gridLayout = generator.Generate(gridConfig);
+var caLayout = generator.Generate(caConfig);
+
+// Each produces different connectivity patterns
+// but same seed ensures deterministic generation per algorithm
+```
+
+### Algorithm Selection Tips
+
+**Choose SpanningTree when:**
+- You want the default, organic branching
+- Backward compatibility is important
+- You need a general-purpose algorithm
+
+**Choose GridBased when:**
+- You want structured, maze-like layouts
+- Grid-based gameplay mechanics are important
+- Clear navigation patterns are desired
+
+**Choose CellularAutomata when:**
+- You want organic, cave-like structures
+- Irregular connectivity is desired
+- Natural-feeling layouts are important
+
+**Choose MazeBased when:**
+- Exploration-focused gameplay is key
+- Complex, winding paths are desired
+- Maze-like experiences are the goal
+
+**Choose HubAndSpoke when:**
+- Hub-based progression is desired
+- Central gathering areas are important
+- Spoke-based exploration fits your design
+
 ## Next Steps
 
 - **[Getting Started](Getting-Started)** - Learn the basics
