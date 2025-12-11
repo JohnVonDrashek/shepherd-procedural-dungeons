@@ -85,23 +85,26 @@ var templates = new List<RoomTemplate<RoomType>>
         .WithDoorsOnSides(Edge.South)
         .Build(),
     
-    // Combat (multiple sizes)
+    // Combat (multiple sizes with weights)
     RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
         .WithId("combat-small")
         .ForRoomTypes(RoomType.Combat)
         .WithDoorsOnAllExteriorEdges()
+        .WithWeight(4.0)  // Small rooms are more common
         .Build(),
     
     RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
         .WithId("combat-medium")
         .ForRoomTypes(RoomType.Combat)
         .WithDoorsOnAllExteriorEdges()
+        .WithWeight(2.0)  // Medium rooms are moderate
         .Build(),
     
     RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
         .WithId("combat-large")
         .ForRoomTypes(RoomType.Combat)
         .WithDoorsOnAllExteriorEdges()
+        .WithWeight(1.0)  // Large rooms are rare
         .Build(),
     
     // Shop
@@ -206,6 +209,77 @@ var config = new FloorConfig<RoomType>
 
 var generator = new FloorGenerator<RoomType>();
 var layout = generator.Generate(config);
+```
+
+## Weighted Template Selection
+
+Using weights to control template frequency:
+
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Spawn
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Boss
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    // Combat templates with different weights
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-common")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(5.0)  // Very common (appears ~71% of the time)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-standard")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(2.0)  // Standard (appears ~29% of the time)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.LShape(5, 4, 2, 2, Corner.TopRight)
+        .WithId("combat-special")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.5)  // Rare special variant (appears ~7% of the time)
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Count template usage
+var templateCounts = layout.Rooms
+    .Where(r => r.RoomType == RoomType.Combat)
+    .GroupBy(r => r.Template.Id)
+    .ToDictionary(g => g.Key, g => g.Count());
+
+foreach (var (templateId, count) in templateCounts)
+{
+    Console.WriteLine($"{templateId}: {count} rooms");
+}
 ```
 
 ## Custom Room Shapes

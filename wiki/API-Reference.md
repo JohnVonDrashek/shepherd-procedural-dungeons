@@ -98,9 +98,12 @@ public required string Id { get; init; }
 public required IReadOnlySet<TRoomType> ValidRoomTypes { get; init; }
 public required IReadOnlySet<Cell> Cells { get; init; }
 public required IReadOnlyDictionary<Cell, Edge> DoorEdges { get; init; }
+public double Weight { get; init; }  // Default: 1.0
 public int Width { get; }
 public int Height { get; }
 ```
+
+**Weight**: Selection weight for this template. Higher weights increase selection probability. Default is 1.0 (uniform distribution when all templates have default weight). Must be greater than 0.
 
 ### Methods
 
@@ -135,8 +138,11 @@ public RoomTemplateBuilder<TRoomType> AddRectangle(int x, int y, int width, int 
 public RoomTemplateBuilder<TRoomType> WithDoorEdges(int x, int y, Edge edges)
 public RoomTemplateBuilder<TRoomType> WithDoorsOnAllExteriorEdges()
 public RoomTemplateBuilder<TRoomType> WithDoorsOnSides(Edge sides)
+public RoomTemplateBuilder<TRoomType> WithWeight(double weight)
 public RoomTemplate<TRoomType> Build()
 ```
+
+**WithWeight**: Sets the selection weight for this template. Weight must be greater than 0. Default is 1.0. Higher weights increase selection probability.
 
 ## PlacedRoom<TRoomType>
 

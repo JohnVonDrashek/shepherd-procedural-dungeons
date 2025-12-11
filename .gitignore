@@ -66,4 +66,5 @@ Thumbs.db
 .idea/
 *.sln.iml
 
-
+## Experimental files
+BOT-PROTOCOL.md

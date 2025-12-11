@@ -245,7 +245,24 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         if (!templates.TryGetValue(roomType, out var available) || available.Count == 0)
             throw new InvalidConfigurationException($"No templates registered for room type {roomType}");
 
-        return available[rng.Next(available.Count)];
+        // Calculate total weight
+        double totalWeight = available.Sum(t => t.Weight);
+        if (totalWeight <= 0)
+            throw new InvalidConfigurationException($"Total weight for room type {roomType} must be positive");
+
+        // Weighted random selection
+        double randomValue = rng.NextDouble() * totalWeight;
+        double cumulative = 0;
+        
+        foreach (var template in available)
+        {
+            cumulative += template.Weight;
+            if (randomValue < cumulative)
+                return template;
+        }
+        
+        // Fallback (shouldn't happen, but for safety)
+        return available[available.Count - 1];
     }
 
     private PlacedRoom<TRoomType> PlaceRoom(int nodeId, RoomTemplate<TRoomType> template, Cell position, TRoomType roomType)

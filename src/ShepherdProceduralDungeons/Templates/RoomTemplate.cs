@@ -28,6 +28,12 @@ public sealed class RoomTemplate<TRoomType> where TRoomType : Enum
     public required IReadOnlyDictionary<Cell, Edge> DoorEdges { get; init; }
 
     /// <summary>
+    /// Weight for template selection. Higher weights increase selection probability.
+    /// Default is 1.0 (uniform distribution when all templates have default weight).
+    /// </summary>
+    public double Weight { get; init; } = 1.0;
+
+    /// <summary>
     /// Gets the bounding box width of this template.
     /// </summary>
     public int Width => Cells.Count > 0 ? Cells.Max(c => c.X) - Cells.Min(c => c.X) + 1 : 0;

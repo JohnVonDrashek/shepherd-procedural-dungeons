@@ -12,6 +12,7 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     private HashSet<TRoomType> _validTypes = new();
     private HashSet<Cell> _cells = new();
     private Dictionary<Cell, Edge> _doorEdges = new();
+    private double _weight = 1.0;
 
     /// <summary>
     /// Sets the template ID.
@@ -186,6 +187,17 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     }
 
     /// <summary>
+    /// Sets the selection weight for this template.
+    /// </summary>
+    /// <param name="weight">Weight value (must be > 0). Default is 1.0.</param>
+    /// <returns>This builder for method chaining.</returns>
+    public RoomTemplateBuilder<TRoomType> WithWeight(double weight)
+    {
+        _weight = weight;
+        return this;
+    }
+
+    /// <summary>
     /// Allows doors only on specific sides of the bounding box.
     /// </summary>
     /// <param name="sides">Which sides (North, South, East, West) to allow doors on.</param>
@@ -243,6 +255,10 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
         if (_doorEdges.Count == 0)
             throw new InvalidConfigurationException($"Template '{_id}' must have at least one door edge");
 
+        // Validate weight
+        if (_weight <= 0)
+            throw new InvalidConfigurationException($"Template '{_id}' weight must be greater than 0, but was {_weight}");
+
         // Validate door edges are on exterior edges
         foreach (var (cell, edges) in _doorEdges)
         {
@@ -268,7 +284,8 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
             Id = _id,
             ValidRoomTypes = _validTypes,
             Cells = _cells,
-            DoorEdges = _doorEdges
+            DoorEdges = _doorEdges,
+            Weight = _weight
         };
     }
 }

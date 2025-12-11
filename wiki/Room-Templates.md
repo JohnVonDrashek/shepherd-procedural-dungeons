@@ -146,6 +146,7 @@ var template = /* ... */ .Build();
 Console.WriteLine($"ID: {template.Id}");
 Console.WriteLine($"Width: {template.Width}");
 Console.WriteLine($"Height: {template.Height}");
+Console.WriteLine($"Weight: {template.Weight}");
 Console.WriteLine($"Valid Types: {string.Join(", ", template.ValidRoomTypes)}");
 Console.WriteLine($"Cell Count: {template.Cells.Count}");
 
@@ -190,6 +191,161 @@ var templates = new List<RoomTemplate<RoomType>>
 ```
 
 When a `Combat` room is generated, one of these three templates will be randomly selected.
+
+## Template Weighting
+
+By default, templates are selected uniformly at random. You can control selection frequency using **weights**. Higher weights increase the probability that a template will be selected.
+
+### Basic Weighting
+
+Use `WithWeight()` to set a template's selection weight:
+
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Common template (appears 3x more often)
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-common")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(3.0)  // 3x weight
+        .Build(),
+    
+    // Rare template (appears less often)
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-rare")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(1.0)  // Default weight
+        .Build()
+};
+```
+
+With weights of 3.0 and 1.0, the common template will be selected approximately 75% of the time (3/(3+1)) and the rare template 25% of the time (1/(3+1)).
+
+### Weight Calculation
+
+Selection probability is calculated as:
+```
+probability = template.Weight / sum(all_template_weights)
+```
+
+**Example:**
+- Template A: weight 2.0
+- Template B: weight 1.0
+- Template C: weight 1.0
+- Total weight: 4.0
+- Template A probability: 2.0/4.0 = 50%
+- Template B probability: 1.0/4.0 = 25%
+- Template C probability: 1.0/4.0 = 25%
+
+### Default Weight
+
+Templates without an explicit weight default to **1.0**, maintaining backward compatibility:
+
+```csharp
+// These are equivalent:
+RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+    .WithId("template1")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .Build();
+
+RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+    .WithId("template2")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .WithWeight(1.0)  // Explicit default
+    .Build();
+```
+
+### Common Use Cases
+
+**Common vs Rare Templates:**
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Default combat room (common)
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-standard")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(5.0)  // Very common
+        .Build(),
+    
+    // Special decorative room (rare)
+    RoomTemplateBuilder<RoomType>.LShape(5, 4, 2, 2, Corner.TopRight)
+        .WithId("combat-special")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.5)  // Rare
+        .Build()
+};
+```
+
+**Size-Based Weighting:**
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Small rooms (more common)
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("combat-small")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(4.0)
+        .Build(),
+    
+    // Medium rooms (moderate)
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-medium")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(2.0)
+        .Build(),
+    
+    // Large rooms (rare, harder to place)
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-large")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(1.0)
+        .Build()
+};
+```
+
+### Weight Validation
+
+Weights must be **positive numbers** (greater than 0). Zero or negative weights will throw `InvalidConfigurationException`:
+
+```csharp
+// ❌ Error: Weight must be greater than 0
+RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+    .WithId("invalid")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .WithWeight(0.0)  // Invalid!
+    .Build();
+
+// ❌ Error: Weight must be greater than 0
+.WithWeight(-1.0)  // Invalid!
+```
+
+### Determinism
+
+Weighted selection is deterministic when using the same seed:
+
+```csharp
+var config1 = new FloorConfig<RoomType> { Seed = 12345, /* ... */ };
+var config2 = new FloorConfig<RoomType> { Seed = 12345, /* ... */ };
+
+var generator = new FloorGenerator<RoomType>();
+var layout1 = generator.Generate(config1);
+var layout2 = generator.Generate(config2);
+
+// Same seed + same weights = same template selections
+```
+
+The same seed with the same template weights will produce identical template selections across multiple runs.
 
 ## Template Validation
 
