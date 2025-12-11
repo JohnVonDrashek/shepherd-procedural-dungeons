@@ -294,6 +294,248 @@ This example demonstrates:
 - **Treasure adjacent to Boss or Combat**: Rewards are near challenging content
 - **Rest adjacent to Combat**: Safe rooms are accessible after fights
 
+## Connection Count Constraints
+
+Example using connection count constraints to control room connectivity:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Hub, Linear, Treasure
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("hub")
+        .ForRoomTypes(RoomType.Hub)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("linear")
+        .ForRoomTypes(RoomType.Linear)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss is a hub (3+ connections) far from spawn
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MinConnectionCountConstraint<RoomType>(RoomType.Boss, 3),
+    
+    // Hub rooms are important branching points (3-5 connections)
+    new MinConnectionCountConstraint<RoomType>(RoomType.Hub, 3),
+    new MaxConnectionCountConstraint<RoomType>(RoomType.Hub, 5),
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Hub, 2),
+    
+    // Linear rooms have exactly 2 connections (simple progression)
+    new MinConnectionCountConstraint<RoomType>(RoomType.Linear, 2),
+    new MaxConnectionCountConstraint<RoomType>(RoomType.Linear, 2),
+    
+    // Treasure rooms are simple (max 2 connections)
+    new MaxConnectionCountConstraint<RoomType>(RoomType.Treasure, 2),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Hub, 2),
+        (RoomType.Linear, 3),
+        (RoomType.Treasure, 2)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Verify connection counts
+foreach (var room in layout.Rooms)
+{
+    // Find the node in the graph to check connection count
+    var nodeId = room.NodeId;
+    Console.WriteLine($"{room.RoomType} at node {nodeId}");
+}
+
+// Count rooms by type
+var hubCount = layout.Rooms.Count(r => r.RoomType == RoomType.Hub);
+var linearCount = layout.Rooms.Count(r => r.RoomType == RoomType.Linear);
+var treasureCount = layout.Rooms.Count(r => r.RoomType == RoomType.Treasure);
+
+Console.WriteLine($"Hub rooms: {hubCount}");
+Console.WriteLine($"Linear rooms: {linearCount}");
+Console.WriteLine($"Treasure rooms: {treasureCount}");
+```
+
+This example demonstrates:
+- **Boss as hub**: Boss rooms have 3+ connections (important areas)
+- **Hub rooms**: Important branching points with 3-5 connections
+- **Linear rooms**: Simple progression rooms with exactly 2 connections
+- **Simple treasure**: Treasure rooms have at most 2 connections
+
+## Distance-Based Room Type Constraints
+
+Example using distance-based constraints to control relationships between room types:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Rest, Secret
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("rest")
+        .ForRoomTypes(RoomType.Rest)
+        .WithDoorsOnSides(Edge.All)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("secret")
+        .ForRoomTypes(RoomType.Secret)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Shop must be within 2 steps of Combat rooms (convenient access)
+    new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Combat, 2),
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    
+    // Rest rooms must be within 2 steps of Combat (accessible after fights)
+    new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Rest, RoomType.Combat, 2),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Rest, 2),
+    
+    // Secret rooms must be at least 3 steps from Boss (hidden away)
+    new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 3),
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Secret, 2),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Secret, 1)
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Rest, 2),
+        (RoomType.Secret, 1)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Verify distance constraints are satisfied
+foreach (var shop in layout.Rooms.Where(r => r.RoomType == RoomType.Shop))
+{
+    Console.WriteLine($"Shop at node {shop.NodeId}");
+    // In a real scenario, you would calculate distances to verify constraints
+}
+
+foreach (var rest in layout.Rooms.Where(r => r.RoomType == RoomType.Rest))
+{
+    Console.WriteLine($"Rest room at node {rest.NodeId}");
+}
+
+foreach (var secret in layout.Rooms.Where(r => r.RoomType == RoomType.Secret))
+{
+    Console.WriteLine($"Secret room at node {secret.NodeId}");
+}
+```
+
+This example demonstrates:
+- **Shop near Combat**: Shops are placed within 2 steps of combat areas for convenient access
+- **Rest near Combat**: Rest rooms are accessible within 2 steps of combat encounters
+- **Secret away from Boss**: Secret rooms are hidden at least 3 steps from boss rooms
+- **Multiple reference types**: Can specify multiple reference types (e.g., "within 2 steps of Combat OR Boss")
+
 ## Linear Dungeon
 
 Minimal branching for a linear progression:

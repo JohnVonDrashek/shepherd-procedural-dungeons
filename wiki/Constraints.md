@@ -68,6 +68,74 @@ new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
 new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
 ```
 
+### MinConnectionCountConstraint
+
+Room must have at least N connections.
+
+```csharp
+new MinConnectionCountConstraint<RoomType>(
+    RoomType.Hub, 
+    minConnections: 3
+)
+```
+
+**Use case:** Create hub rooms (important areas with multiple paths), branching points, or rooms that serve as central navigation points.
+
+**Example:**
+```csharp
+// Hub rooms require at least 3 connections (important areas)
+new MinConnectionCountConstraint<RoomType>(RoomType.Hub, 3)
+
+// Boss room must be a major hub (4+ connections)
+new MinConnectionCountConstraint<RoomType>(RoomType.Boss, 4)
+```
+
+**Behavior:**
+- Validates that `node.ConnectionCount >= minConnections`
+- Throws `ArgumentOutOfRangeException` if `minConnections < 0`
+- Setting `minConnections = 0` allows all nodes (no minimum requirement)
+
+### MaxConnectionCountConstraint
+
+Room must have at most N connections.
+
+```csharp
+new MaxConnectionCountConstraint<RoomType>(
+    RoomType.Linear, 
+    maxConnections: 2
+)
+```
+
+**Use case:** Ensure linear progression rooms (exactly 2 connections), prevent rooms from becoming hubs, or create simple branching points.
+
+**Example:**
+```csharp
+// Linear rooms have at most 2 connections (simple progression)
+new MaxConnectionCountConstraint<RoomType>(RoomType.Linear, 2)
+
+// Treasure rooms should be simple (max 2 connections)
+new MaxConnectionCountConstraint<RoomType>(RoomType.Treasure, 2)
+```
+
+**Behavior:**
+- Validates that `node.ConnectionCount <= maxConnections`
+- Throws `ArgumentOutOfRangeException` if `maxConnections < 0`
+- Setting `maxConnections` to a very large number allows all nodes (no maximum limit)
+
+**Combining Min and Max:**
+
+You can combine both constraints to create exact connection count requirements:
+
+```csharp
+// Exactly 2 connections (linear rooms)
+new MinConnectionCountConstraint<RoomType>(RoomType.Linear, 2),
+new MaxConnectionCountConstraint<RoomType>(RoomType.Linear, 2)
+
+// 2-4 connections (branching points)
+new MinConnectionCountConstraint<RoomType>(RoomType.Branch, 2),
+new MaxConnectionCountConstraint<RoomType>(RoomType.Branch, 4)
+```
+
 ### NotOnCriticalPathConstraint
 
 Room must NOT be on the critical path (spawn to boss).
@@ -227,6 +295,115 @@ new MustNotBeAdjacentToConstraint<RoomType>(
 - Returns `true` if the node has no connections (can't violate adjacency constraint)
 - Unassigned neighbors don't cause violations
 
+### MinDistanceFromRoomTypeConstraint
+
+Room must be at least N steps from rooms of specified type(s) in the graph topology.
+
+```csharp
+// Single reference type
+new MinDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Secret, 
+    RoomType.Boss, 
+    minDistance: 3
+)
+
+// Multiple reference types (at least N steps from ANY of these)
+new MinDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Secret,
+    minDistance: 3,
+    RoomType.Boss,
+    RoomType.Combat
+)
+```
+
+**Use case:** Create separation between room types. Common scenarios include:
+- Secret rooms should be hidden away from boss rooms
+- Rest rooms should be separated from spawn rooms
+- Special rooms should maintain minimum distance from each other
+- Prevent clustering of specific room types
+
+**Important:** This constraint operates on the **graph structure** (shortest path distance between nodes), not spatial distance. Distance is measured in graph steps (number of edges), not spatial coordinates.
+
+**Example:**
+```csharp
+// Secret rooms must be at least 3 steps from Boss rooms
+new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 3)
+
+// Rest rooms must be at least 2 steps from Spawn OR Combat rooms
+new MinDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Rest,
+    2,
+    RoomType.Spawn,
+    RoomType.Combat
+)
+
+// Secret rooms must be at least 2 steps from other Secret rooms (prevent clustering)
+new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Secret, 2)
+```
+
+**Behavior:**
+- Calculates shortest path distance using BFS (Breadth-First Search)
+- Returns `true` if shortest distance to nearest reference room type is >= minDistance
+- Returns `true` if no reference rooms exist yet (permissive, allows assignment order flexibility)
+- Returns `true` if no path exists (disconnected graph) - infinite distance satisfies minimum requirement
+- Works correctly with partially assigned graphs (only checks already-assigned reference rooms)
+- If target and reference are the same type, ensures minimum separation between rooms of that type
+
+### MaxDistanceFromRoomTypeConstraint
+
+Room must be at most N steps from rooms of specified type(s) in the graph topology.
+
+```csharp
+// Single reference type
+new MaxDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Rest, 
+    RoomType.Combat, 
+    maxDistance: 2
+)
+
+// Multiple reference types (within N steps of ANY of these)
+new MaxDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Shop,
+    maxDistance: 2,
+    RoomType.Combat,
+    RoomType.Boss
+)
+```
+
+**Use case:** Ensure accessibility and proximity between room types. Common scenarios include:
+- Rest/healing rooms should be accessible after combat encounters
+- Shop rooms should be conveniently located near combat areas
+- Special rooms should be within reach of key areas
+- Create convenient placement relationships
+
+**Important:** This constraint operates on the **graph structure** (shortest path distance between nodes), not spatial distance. Distance is measured in graph steps (number of edges), not spatial coordinates.
+
+**Example:**
+```csharp
+// Rest rooms must be within 2 steps of Combat rooms
+new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Rest, RoomType.Combat, 2)
+
+// Shop rooms must be within 2 steps of Combat OR Boss rooms
+new MaxDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Shop,
+    2,
+    RoomType.Combat,
+    RoomType.Boss
+)
+
+// Shop rooms must be within 1 step of other Shop rooms (allow clustering)
+new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Shop, 1)
+```
+
+**Behavior:**
+- Calculates shortest path distance using BFS (Breadth-First Search)
+- Returns `true` if shortest distance to nearest reference room type is <= maxDistance
+- Returns `true` if no assignments exist yet (permissive, allows assignment order flexibility)
+- Returns `false` if reference rooms exist but none are within maxDistance
+- Returns `false` if no path exists (disconnected graph) - infinite distance violates maximum requirement
+- Works correctly with partially assigned graphs (only checks already-assigned reference rooms)
+- If target and reference are the same type, allows clustering within the specified distance
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -268,11 +445,16 @@ var constraints = new List<IConstraint<RoomType>>
 {
     // Boss constraints
     new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MinConnectionCountConstraint<RoomType>(RoomType.Boss, 3),  // Boss is a hub
     new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Hub room constraints (important branching points)
+    new MinConnectionCountConstraint<RoomType>(RoomType.Hub, 3),
+    new MaxConnectionCountConstraint<RoomType>(RoomType.Hub, 5),
     
     // Treasure constraints
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
-    new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
+    new MaxConnectionCountConstraint<RoomType>(RoomType.Treasure, 2),  // Simple rooms
     new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2),
     new MustBeAdjacentToConstraint<RoomType>(RoomType.Treasure, RoomType.Boss),
     
@@ -281,7 +463,17 @@ var constraints = new List<IConstraint<RoomType>>
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
     new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
     new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
-    new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Shop)  // Prevent shop clustering
+    new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Shop),  // Prevent shop clustering
+    new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Combat, 2),  // Near combat areas
+    
+    // Rest room constraints
+    new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Rest, RoomType.Combat, 2),  // Accessible after fights
+    new MaxPerFloorConstraint<RoomType>(RoomType.Rest, 2),
+    
+    // Secret room constraints
+    new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 3),  // Hidden from boss
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret)
 };
 ```
 
@@ -302,10 +494,17 @@ Within each category, constraints are checked in the order they appear in your l
 
 ```csharp
 new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+new MinConnectionCountConstraint<RoomType>(RoomType.Boss, 3),  // Boss is a hub
 new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
 ```
 
-Boss is far from spawn and is a dead end (final encounter).
+Boss is far from spawn, is a hub (3+ connections), and is a dead end (final encounter).
+
+**Alternative:** If you want boss to be a simple dead end without hub requirement:
+```csharp
+new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)  // Exactly 1 connection
+```
 
 ### Treasure Room Pattern
 
@@ -339,6 +538,45 @@ new MaxPerFloorConstraint<RoomType>(RoomType.Secret, 1)
 ```
 
 Secret room is hidden, optional, far enough to be meaningful.
+
+### Hub Room Pattern
+
+```csharp
+new MinConnectionCountConstraint<RoomType>(RoomType.Hub, 3),
+new MaxConnectionCountConstraint<RoomType>(RoomType.Hub, 5),
+new MinDistanceFromStartConstraint<RoomType>(RoomType.Hub, 2)
+```
+
+Hub rooms are important branching points (3-5 connections) that appear after initial exploration.
+
+### Linear Room Pattern
+
+```csharp
+new MinConnectionCountConstraint<RoomType>(RoomType.Linear, 2),
+new MaxConnectionCountConstraint<RoomType>(RoomType.Linear, 2)
+```
+
+Linear rooms have exactly 2 connections, creating simple progression paths.
+
+### Rest Room Pattern (Distance-Based)
+
+```csharp
+new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Rest, RoomType.Combat, 2),
+new MaxPerFloorConstraint<RoomType>(RoomType.Rest, 2)
+```
+
+Rest rooms are accessible within 2 steps of combat areas, providing safe havens after fights.
+
+### Secret Room Pattern (Distance-Based)
+
+```csharp
+new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 3),
+new MinDistanceFromStartConstraint<RoomType>(RoomType.Secret, 2),
+new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),
+new MustBeDeadEndConstraint<RoomType>(RoomType.Secret)
+```
+
+Secret rooms are hidden away (at least 3 steps from boss, at least 2 from spawn), optional, and in dead ends.
 
 ## Troubleshooting Constraints
 

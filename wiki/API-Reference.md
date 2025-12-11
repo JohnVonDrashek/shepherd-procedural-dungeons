@@ -218,6 +218,30 @@ public class MustBeDeadEndConstraint<TRoomType> : IConstraint<TRoomType>
 }
 ```
 
+#### MinConnectionCountConstraint
+
+```csharp
+public class MinConnectionCountConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public int MinConnections { get; }
+    
+    public MinConnectionCountConstraint(TRoomType roomType, int minConnections);
+}
+```
+
+#### MaxConnectionCountConstraint
+
+```csharp
+public class MaxConnectionCountConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public int MaxConnections { get; }
+    
+    public MaxConnectionCountConstraint(TRoomType roomType, int maxConnections);
+}
+```
+
 #### NotOnCriticalPathConstraint
 
 ```csharp
@@ -287,6 +311,40 @@ public class MustNotBeAdjacentToConstraint<TRoomType> : IConstraint<TRoomType>
     
     // Multiple forbidden adjacent types from collection
     public MustNotBeAdjacentToConstraint(TRoomType targetRoomType, IEnumerable<TRoomType> forbiddenAdjacentTypes);
+}
+```
+
+#### MinDistanceFromRoomTypeConstraint
+
+```csharp
+public class MinDistanceFromRoomTypeConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ReferenceRoomTypes { get; }
+    public int MinDistance { get; }
+    
+    // Single reference type
+    public MinDistanceFromRoomTypeConstraint(TRoomType targetRoomType, TRoomType referenceRoomType, int minDistance);
+    
+    // Multiple reference types (OR logic)
+    public MinDistanceFromRoomTypeConstraint(TRoomType targetRoomType, int minDistance, params TRoomType[] referenceRoomTypes);
+}
+```
+
+#### MaxDistanceFromRoomTypeConstraint
+
+```csharp
+public class MaxDistanceFromRoomTypeConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ReferenceRoomTypes { get; }
+    public int MaxDistance { get; }
+    
+    // Single reference type
+    public MaxDistanceFromRoomTypeConstraint(TRoomType targetRoomType, TRoomType referenceRoomType, int maxDistance);
+    
+    // Multiple reference types (OR logic)
+    public MaxDistanceFromRoomTypeConstraint(TRoomType targetRoomType, int maxDistance, params TRoomType[] referenceRoomTypes);
 }
 ```
 
