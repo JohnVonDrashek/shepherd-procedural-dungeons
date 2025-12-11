@@ -4,7 +4,7 @@ Quick reference for main classes and methods.
 
 ## FloorGenerator<TRoomType>
 
-Main entry point for dungeon generation.
+Main entry point for single-floor dungeon generation.
 
 ### Constructor
 
@@ -36,9 +36,97 @@ Generates a floor layout from configuration.
 - `ConstraintViolationException` - Constraints cannot be satisfied
 - `SpatialPlacementException` - Rooms cannot be placed
 
+## MultiFloorGenerator<TRoomType>
+
+Main entry point for multi-floor dungeon generation.
+
+### Constructor
+
+```csharp
+// Default constructor (uses IncrementalSolver)
+public MultiFloorGenerator()
+
+// Custom spatial solver
+public MultiFloorGenerator(ISpatialSolver<TRoomType> spatialSolver)
+```
+
+### Methods
+
+#### Generate
+
+```csharp
+public MultiFloorLayout<TRoomType> Generate(MultiFloorConfig<TRoomType> config)
+```
+
+Generates a multi-floor dungeon layout from configuration.
+
+**Parameters:**
+- `config` - Multi-floor generation configuration
+
+**Returns:** `MultiFloorLayout<TRoomType>` - Generated multi-floor dungeon layout
+
+**Exceptions:**
+- `InvalidConfigurationException` - Config is invalid
+- `ConstraintViolationException` - Constraints cannot be satisfied
+- `SpatialPlacementException` - Rooms cannot be placed
+
+## MultiFloorConfig<TRoomType>
+
+Configuration for multi-floor dungeon generation.
+
+### Properties
+
+```csharp
+public required int Seed { get; init; }
+public required IReadOnlyList<FloorConfig<TRoomType>> Floors { get; init; }
+public required IReadOnlyList<FloorConnection> Connections { get; init; }
+```
+
+## FloorConnection
+
+Represents a connection between two floors.
+
+### Properties
+
+```csharp
+public required int FromFloorIndex { get; init; }
+public required int FromRoomNodeId { get; init; }
+public required int ToFloorIndex { get; init; }
+public required int ToRoomNodeId { get; init; }
+public required ConnectionType Type { get; init; }
+```
+
+## ConnectionType
+
+Enumeration of connection types between floors.
+
+### Values
+
+```csharp
+public enum ConnectionType
+{
+    StairsUp,      // Stairs going up to a higher floor
+    StairsDown,    // Stairs going down to a lower floor
+    Teleporter     // Teleporter pad/portal connecting floors
+}
+```
+
+## MultiFloorLayout<TRoomType>
+
+Generated multi-floor dungeon output.
+
+### Properties
+
+```csharp
+public required IReadOnlyList<FloorLayout<TRoomType>> Floors { get; init; }
+public required IReadOnlyList<FloorConnection> Connections { get; init; }
+public required int Seed { get; init; }
+public required int TotalFloorCount { get; init; }
+```
+
 ## FloorConfig<TRoomType>
 
-Configuration for dungeon generation.
+Configuration for single-floor dungeon generation.
 
 ### Properties
 
@@ -275,6 +363,62 @@ public class MaxPerFloorConstraint<TRoomType> : IConstraint<TRoomType>
     public MaxPerFloorConstraint(TRoomType roomType, int maxCount);
 }
 ```
+
+#### OnlyOnFloorConstraint
+
+```csharp
+public class OnlyOnFloorConstraint<TRoomType> : IFloorAwareConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlyList<int> AllowedFloors { get; }
+    
+    public OnlyOnFloorConstraint(TRoomType roomType, IReadOnlyList<int> allowedFloors);
+}
+```
+
+**Use case:** Restrict room types to specific floors (e.g., boss only on final floor).
+
+#### NotOnFloorConstraint
+
+```csharp
+public class NotOnFloorConstraint<TRoomType> : IFloorAwareConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlyList<int> ForbiddenFloors { get; }
+    
+    public NotOnFloorConstraint(TRoomType roomType, IReadOnlyList<int> forbiddenFloors);
+}
+```
+
+**Use case:** Prevent room types from appearing on specific floors.
+
+#### MinFloorConstraint
+
+```csharp
+public class MinFloorConstraint<TRoomType> : IFloorAwareConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public int MinFloor { get; }
+    
+    public MinFloorConstraint(TRoomType roomType, int minFloor);
+}
+```
+
+**Use case:** Require room types to appear on floor N or higher (e.g., boss only on floor 2+).
+
+#### MaxFloorConstraint
+
+```csharp
+public class MaxFloorConstraint<TRoomType> : IFloorAwareConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public int MaxFloor { get; }
+    
+    public MaxFloorConstraint(TRoomType roomType, int maxFloor);
+}
+```
+
+**Use case:** Require room types to appear on floor N or lower (e.g., tutorial rooms only on floor 0).
 
 #### MustBeAdjacentToConstraint
 
@@ -549,6 +693,19 @@ public class SpatialPlacementException : GenerationException
 ```
 
 ## Advanced Interfaces
+
+### IFloorAwareConstraint<TRoomType>
+
+Interface for constraints that are aware of the current floor index.
+
+```csharp
+public interface IFloorAwareConstraint<TRoomType> : IConstraint<TRoomType> where TRoomType : Enum
+{
+    void SetFloorIndex(int floorIndex);
+}
+```
+
+**Use case:** Implement floor-aware constraints that need to know which floor is being generated.
 
 ### ISpatialSolver<TRoomType>
 

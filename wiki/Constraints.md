@@ -190,6 +190,102 @@ new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1)
 new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
 ```
 
+### OnlyOnFloorConstraint
+
+Room type must ONLY be placed on specific floors. This constraint is floor-aware and only works in multi-floor dungeons.
+
+```csharp
+new OnlyOnFloorConstraint<RoomType>(
+    RoomType.Boss, 
+    allowedFloors: new[] { 2 }
+)
+```
+
+**Use case:** Restrict room types to specific floors (e.g., boss only on final floor).
+
+**Example:**
+```csharp
+// Boss only on floor 2 (final floor)
+new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 })
+
+// Shop only on floors 0 and 1
+new OnlyOnFloorConstraint<RoomType>(RoomType.Shop, new[] { 0, 1 })
+```
+
+**Important:** This constraint implements `IFloorAwareConstraint` and requires the floor index to be set during multi-floor generation. It's automatically handled by `MultiFloorGenerator`.
+
+### NotOnFloorConstraint
+
+Room type must NOT be placed on specific floors. This constraint is floor-aware and only works in multi-floor dungeons.
+
+```csharp
+new NotOnFloorConstraint<RoomType>(
+    RoomType.Boss, 
+    forbiddenFloors: new[] { 0, 1 }
+)
+```
+
+**Use case:** Prevent room types from appearing on specific floors.
+
+**Example:**
+```csharp
+// Boss not on floors 0 or 1 (only on deeper floors)
+new NotOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 0, 1 })
+
+// Tutorial rooms not on floors 2+
+new NotOnFloorConstraint<RoomType>(RoomType.Tutorial, new[] { 2, 3, 4 })
+```
+
+**Important:** This constraint implements `IFloorAwareConstraint` and requires the floor index to be set during multi-floor generation. It's automatically handled by `MultiFloorGenerator`.
+
+### MinFloorConstraint
+
+Room type must be placed on floor N or higher (0-based). This constraint is floor-aware and only works in multi-floor dungeons.
+
+```csharp
+new MinFloorConstraint<RoomType>(
+    RoomType.Boss, 
+    minFloor: 2
+)
+```
+
+**Use case:** Require room types to appear on floor N or higher (e.g., boss only on floor 2+).
+
+**Example:**
+```csharp
+// Boss only on floor 2 or higher
+new MinFloorConstraint<RoomType>(RoomType.Boss, 2)
+
+// Elite enemies only on floor 1 or higher
+new MinFloorConstraint<RoomType>(RoomType.Elite, 1)
+```
+
+**Important:** This constraint implements `IFloorAwareConstraint` and requires the floor index to be set during multi-floor generation. It's automatically handled by `MultiFloorGenerator`.
+
+### MaxFloorConstraint
+
+Room type must be placed on floor N or lower (0-based). This constraint is floor-aware and only works in multi-floor dungeons.
+
+```csharp
+new MaxFloorConstraint<RoomType>(
+    RoomType.Tutorial, 
+    maxFloor: 0
+)
+```
+
+**Use case:** Require room types to appear on floor N or lower (e.g., tutorial rooms only on floor 0).
+
+**Example:**
+```csharp
+// Tutorial rooms only on floor 0
+new MaxFloorConstraint<RoomType>(RoomType.Tutorial, 0)
+
+// Easy combat only on floors 0-1
+new MaxFloorConstraint<RoomType>(RoomType.EasyCombat, 1)
+```
+
+**Important:** This constraint implements `IFloorAwareConstraint` and requires the floor index to be set during multi-floor generation. It's automatically handled by `MultiFloorGenerator`.
+
 ### MustBeAdjacentToConstraint
 
 Room must be adjacent to at least one of the specified room types in the graph topology.
@@ -645,6 +741,32 @@ new MinDistanceFromStartConstraint<RoomType>(RoomType.MiniBoss, 3)
 
 Mini-boss must appear before the final boss on the critical path, ensuring proper progression order.
 
+### Multi-Floor Boss Pattern
+
+```csharp
+// Boss only on final floor
+new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 }),
+new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 8),
+new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
+```
+
+Boss appears only on the final floor (floor 2), far from spawn, and is a dead end.
+
+### Multi-Floor Progressive Difficulty Pattern
+
+```csharp
+// Easy rooms only on early floors
+new MaxFloorConstraint<RoomType>(RoomType.EasyCombat, 1),
+
+// Hard rooms only on later floors
+new MinFloorConstraint<RoomType>(RoomType.HardCombat, 2),
+
+// Boss only on final floor
+new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 4 })
+```
+
+Creates progressive difficulty where easy rooms appear early, hard rooms appear later, and boss is on the final floor.
+
 ## Troubleshooting Constraints
 
 ### ConstraintViolationException
@@ -754,9 +876,50 @@ new CustomConstraint<RoomType>(
 4. **Consider graph structure**: More branching = more dead ends
 5. **Use CustomConstraint sparingly**: Built-in constraints are usually enough
 
+## Floor-Aware Constraints
+
+Floor-aware constraints (`IFloorAwareConstraint`) are special constraints that know which floor is being generated. They're used in multi-floor dungeons to control room placement based on floor number.
+
+### Available Floor-Aware Constraints
+
+- `OnlyOnFloorConstraint` - Room type must be on specific floors
+- `NotOnFloorConstraint` - Room type cannot be on specific floors
+- `MinFloorConstraint` - Room type must be on floor N or higher
+- `MaxFloorConstraint` - Room type must be on floor N or lower
+
+### How They Work
+
+When using `MultiFloorGenerator`, floor-aware constraints are automatically configured with the current floor index:
+
+```csharp
+var floor0Config = new FloorConfig<RoomType>
+{
+    // ...
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 })
+    }
+};
+
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Floors = new[] { floor0Config, floor1Config, floor2Config },
+    // ...
+};
+
+// MultiFloorGenerator automatically sets floor index on floor-aware constraints
+var generator = new MultiFloorGenerator<RoomType>();
+var layout = generator.Generate(multiFloorConfig);
+```
+
+### Backward Compatibility
+
+Floor-aware constraints work in single-floor dungeons too - they simply allow all placements when the floor index isn't set, ensuring backward compatibility.
+
 ## Next Steps
 
-- **[Configuration](Configuration)** - How to use constraints in config
-- **[Examples](Examples)** - See constraints in action
+- **[Configuration](Configuration)** - How to use constraints in config, including multi-floor configs
+- **[Examples](Examples)** - See constraints in action, including multi-floor examples
 - **[Troubleshooting](Troubleshooting)** - Fix constraint issues
+- **[Advanced Topics](Advanced-Topics#multi-floor-dungeons)** - Learn more about multi-floor generation
 

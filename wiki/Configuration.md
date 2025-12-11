@@ -355,9 +355,216 @@ new FloorConfig<RoomType>
 4. **Consider performance**: Very large `RoomCount` (50+) may be slow
 5. **Save working configs**: Keep seeds for good dungeons
 
+## MultiFloorConfig<TRoomType>
+
+Configuration for generating multi-floor dungeons with vertical connections between floors.
+
+### Properties
+
+#### Seed
+
+```csharp
+Seed = 12345
+```
+
+**Type:** `int`
+
+**Description:** Seed for deterministic generation. Same seed + same config = identical multi-floor dungeon.
+
+#### Floors
+
+```csharp
+Floors = new[]
+{
+    floorConfig1,
+    floorConfig2,
+    floorConfig3
+}
+```
+
+**Type:** `IReadOnlyList<FloorConfig<TRoomType>>`
+
+**Description:** Configuration for each floor in the dungeon. Each floor is generated independently using its own `FloorConfig`.
+
+**Requirements:**
+- Must contain at least one floor
+- Each floor config must be valid (see `FloorConfig` requirements above)
+
+#### Connections
+
+```csharp
+Connections = new[]
+{
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 4,
+        ToFloorIndex = 1,
+        ToRoomNodeId = 0,
+        Type = ConnectionType.StairsDown
+    }
+}
+```
+
+**Type:** `IReadOnlyList<FloorConnection>`
+
+**Description:** Connections between floors. Defines how rooms on different floors connect via stairs or teleporters.
+
+**Requirements:**
+- Floor indices must be valid (0 to Floors.Count - 1)
+- Room node IDs must exist on their respective floors
+- Connections must connect different floors (cannot connect a floor to itself)
+
+### FloorConnection
+
+Represents a connection between two floors.
+
+#### Properties
+
+- `FromFloorIndex` (int) - Index of the source floor (0-based)
+- `FromRoomNodeId` (int) - Node ID of the room on the source floor
+- `ToFloorIndex` (int) - Index of the destination floor (0-based)
+- `ToRoomNodeId` (int) - Node ID of the room on the destination floor
+- `Type` (ConnectionType) - Type of connection (StairsUp, StairsDown, or Teleporter)
+
+### ConnectionType
+
+Enumeration of connection types between floors:
+
+- `StairsUp` - Stairs going up to a higher floor
+- `StairsDown` - Stairs going down to a lower floor
+- `Teleporter` - Teleporter pad/portal connecting floors
+
+### Complete Multi-Floor Example
+
+```csharp
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // ... templates ...
+};
+
+// Floor 0 configuration
+var floor0Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 10,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+// Floor 1 configuration
+var floor1Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 12,  // More rooms on deeper floor
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.35f,  // Slightly more complex
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 1 })  // Boss only on floor 1
+    }
+};
+
+// Floor 2 configuration
+var floor2Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,  // Even more rooms
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.4f,
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 })  // Boss only on floor 2
+    }
+};
+
+// Define connections between floors
+var connections = new[]
+{
+    // Stairs from floor 0 to floor 1
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 9,  // Last room on floor 0
+        ToFloorIndex = 1,
+        ToRoomNodeId = 0,   // First room on floor 1
+        Type = ConnectionType.StairsDown
+    },
+    // Stairs from floor 1 to floor 2
+    new FloorConnection
+    {
+        FromFloorIndex = 1,
+        FromRoomNodeId = 11,  // Last room on floor 1
+        ToFloorIndex = 2,
+        ToRoomNodeId = 0,     // First room on floor 2
+        Type = ConnectionType.StairsDown
+    },
+    // Teleporter from floor 0 to floor 2 (skip floor 1)
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 5,
+        ToFloorIndex = 2,
+        ToRoomNodeId = 7,
+        Type = ConnectionType.Teleporter
+    }
+};
+
+// Multi-floor configuration
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config, floor2Config },
+    Connections = connections
+};
+
+// Generate multi-floor dungeon
+var generator = new MultiFloorGenerator<RoomType>();
+var multiFloorLayout = generator.Generate(multiFloorConfig);
+
+// Access individual floors
+foreach (var floor in multiFloorLayout.Floors)
+{
+    Console.WriteLine($"Floor has {floor.Rooms.Count} rooms");
+}
+
+// Access connections
+foreach (var connection in multiFloorLayout.Connections)
+{
+    Console.WriteLine($"Floor {connection.FromFloorIndex} room {connection.FromRoomNodeId} -> " +
+                     $"Floor {connection.ToFloorIndex} room {connection.ToRoomNodeId} ({connection.Type})");
+}
+```
+
+### Multi-Floor Configuration Tips
+
+1. **Use floor-aware constraints**: Use `OnlyOnFloorConstraint`, `NotOnFloorConstraint`, `MinFloorConstraint`, or `MaxFloorConstraint` to control room placement per floor
+2. **Progressive difficulty**: Increase room count and complexity on deeper floors
+3. **Connection planning**: Plan connections before generation to ensure valid room IDs
+4. **Determinism**: Same seed produces identical multi-floor layout
+5. **Backward compatibility**: Single-floor generation still works with `FloorGenerator`
+
+### Validation
+
+The generator validates:
+- At least one floor is specified
+- All floor indices in connections are valid
+- All room node IDs in connections exist on their floors
+- Connections connect different floors
+
 ## Next Steps
 
-- **[Constraints](Constraints)** - Understand constraint system
+- **[Constraints](Constraints)** - Understand constraint system, including floor-aware constraints
 - **[Hallway Modes](Hallway-Modes)** - Choose the right hallway mode
-- **[Examples](Examples)** - See complete configurations
+- **[Examples](Examples)** - See complete configurations, including multi-floor examples
+- **[Advanced Topics](Advanced-Topics#multi-floor-dungeons)** - Learn more about multi-floor generation
 

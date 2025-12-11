@@ -21,6 +21,7 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
     /// <param name="constraints">Constraints for room type placement.</param>
     /// <param name="rng">Random number generator.</param>
     /// <param name="assignments">Output dictionary mapping node IDs to room types.</param>
+    /// <param name="floorIndex">Optional floor index for floor-aware constraints. Use -1 for single-floor generation.</param>
     public void AssignTypes(
         FloorGraph graph,
         TRoomType spawnType,
@@ -29,8 +30,21 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
         IReadOnlyList<(TRoomType type, int count)> roomRequirements,
         IReadOnlyList<IConstraint<TRoomType>> constraints,
         Random rng,
-        out Dictionary<int, TRoomType> assignments)
+        out Dictionary<int, TRoomType> assignments,
+        int floorIndex = -1)
     {
+        // Set floor index on floor-aware constraints
+        if (floorIndex >= 0)
+        {
+            foreach (var constraint in constraints)
+            {
+                if (constraint is IFloorAwareConstraint<TRoomType> floorAware)
+                {
+                    floorAware.SetFloorIndex(floorIndex);
+                }
+            }
+        }
+
         var localAssignments = new Dictionary<int, TRoomType>();
 
         // 1. Assign spawn to start node
@@ -45,17 +59,41 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
             .ToList();
 
         if (validBossNodes.Count == 0)
-            throw new ConstraintViolationException($"No valid location for {bossType}");
-
-        var bossNode = validBossNodes[rng.Next(validBossNodes.Count)];
-        localAssignments[bossNode.Id] = bossType;
-        graph.BossNodeId = bossNode.Id;
-
-        // 3. Calculate critical path via BFS from start to boss
-        graph.CriticalPath = FindPath(graph, graph.StartNodeId, bossNode.Id);
-        foreach (int nodeId in graph.CriticalPath)
         {
-            graph.Nodes.First(n => n.Id == nodeId).IsOnCriticalPath = true;
+            // Check if this is due to floor-aware constraints (multi-floor scenario)
+            // If all boss constraints are floor-aware and prevent placement, skip boss placement
+            var floorAwareBossConstraints = bossConstraints.OfType<IFloorAwareConstraint<TRoomType>>().ToList();
+            if (floorAwareBossConstraints.Count > 0 && floorAwareBossConstraints.Count == bossConstraints.Count)
+            {
+                // All constraints are floor-aware and prevent placement - skip boss for this floor
+                graph.BossNodeId = -1; // Mark as no boss
+            }
+            else
+            {
+                throw new ConstraintViolationException($"No valid location for {bossType}");
+            }
+        }
+        else
+        {
+            var bossNode = validBossNodes[rng.Next(validBossNodes.Count)];
+            localAssignments[bossNode.Id] = bossType;
+            graph.BossNodeId = bossNode.Id;
+        }
+
+        // 3. Calculate critical path via BFS from start to boss (if boss exists)
+        if (graph.BossNodeId >= 0)
+        {
+            graph.CriticalPath = FindPath(graph, graph.StartNodeId, graph.BossNodeId);
+            foreach (int nodeId in graph.CriticalPath)
+            {
+                graph.Nodes.First(n => n.Id == nodeId).IsOnCriticalPath = true;
+            }
+        }
+        else
+        {
+            // No boss room - critical path is just the start node
+            graph.CriticalPath = new[] { graph.StartNodeId };
+            graph.Nodes.First(n => n.Id == graph.StartNodeId).IsOnCriticalPath = true;
         }
 
         // 4. Assign required room types based on constraints
@@ -154,6 +192,10 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                 nameof(OnlyOnCriticalPathConstraint<TRoomType>) => 8,
                 nameof(NotOnCriticalPathConstraint<TRoomType>) => 7,
                 nameof(MaxPerFloorConstraint<TRoomType>) => 5,
+                nameof(OnlyOnFloorConstraint<TRoomType>) => 9,
+                nameof(NotOnFloorConstraint<TRoomType>) => 9,
+                nameof(MinFloorConstraint<TRoomType>) => 6,
+                nameof(MaxFloorConstraint<TRoomType>) => 6,
                 nameof(MinDistanceFromStartConstraint<TRoomType>) => 3,
                 nameof(MaxDistanceFromStartConstraint<TRoomType>) => 3,
                 nameof(CustomConstraint<TRoomType>) => 1,

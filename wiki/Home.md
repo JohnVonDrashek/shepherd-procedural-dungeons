@@ -24,9 +24,10 @@ All generation is **deterministic** - same seed + config = identical output.
 ### Main Topics
 - **[Room Templates](Room-Templates)** - Define room shapes and door placements
 - **[Constraints](Constraints)** - Control where special rooms are placed
-- **[Configuration](Configuration)** - Complete guide to `FloorConfig`
+- **[Configuration](Configuration)** - Complete guide to `FloorConfig` and `MultiFloorConfig`
 - **[Hallway Modes](Hallway-Modes)** - Understanding hallway generation options
-- **[Working with Output](Working-with-Output)** - Using the generated `FloorLayout`
+- **[Working with Output](Working-with-Output)** - Using the generated `FloorLayout` and `MultiFloorLayout`
+- **[Multi-Floor Dungeons](Advanced-Topics#multi-floor-dungeons)** - Generate multi-level dungeons with stairs and teleporters
 
 ### Examples & Help
 - **[Examples](Examples)** - Complete, runnable examples for common scenarios
@@ -108,7 +109,6 @@ foreach (var room in layout.Rooms)
 - ❌ Rendering (your responsibility)
 - ❌ Room interior content (enemies, obstacles, tiles)
 - ❌ Physics or collision
-- ❌ Multi-floor/stairs (out of scope for v1)
 
 ## Next Steps
 

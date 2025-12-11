@@ -40,6 +40,20 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
     /// <exception cref="SpatialPlacementException">Rooms cannot be placed.</exception>
     public FloorLayout<TRoomType> Generate(FloorConfig<TRoomType> config)
     {
+        return Generate(config, -1);
+    }
+
+    /// <summary>
+    /// Generates a floor layout from the given configuration with optional floor index for floor-aware constraints.
+    /// </summary>
+    /// <param name="config">Generation configuration.</param>
+    /// <param name="floorIndex">Floor index for floor-aware constraints. Use -1 for single-floor generation.</param>
+    /// <returns>The generated floor layout.</returns>
+    /// <exception cref="InvalidConfigurationException">Config is invalid.</exception>
+    /// <exception cref="ConstraintViolationException">Constraints cannot be satisfied.</exception>
+    /// <exception cref="SpatialPlacementException">Rooms cannot be placed.</exception>
+    internal FloorLayout<TRoomType> Generate(FloorConfig<TRoomType> config, int floorIndex)
+    {
         // Validate configuration
         ValidateConfig(config);
 
@@ -64,7 +78,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         var graphGenerator = new GraphGenerator();
         var graph = graphGenerator.Generate(config.RoomCount, config.BranchingFactor, graphRng);
 
-        // 2. Assign room types
+        // 2. Assign room types (pass floor index for floor-aware constraints)
         var typeAssigner = new RoomTypeAssigner<TRoomType>();
         typeAssigner.AssignTypes(
             graph,
@@ -74,7 +88,8 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             config.RoomRequirements,
             config.Constraints,
             typeRng,
-            out var assignments);
+            out var assignments,
+            floorIndex);
 
         // 3. Organize templates by room type
         var templatesByType = new Dictionary<TRoomType, List<RoomTemplate<TRoomType>>>();

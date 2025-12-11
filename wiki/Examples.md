@@ -839,38 +839,242 @@ var generator = new FloorGenerator<RoomType>();
 var layout = generator.Generate(config);
 ```
 
-## Multiple Floors
+## Multi-Floor Dungeon
 
-Generate multiple floors with different seeds:
+Generate a multi-floor dungeon with stairs and teleporters connecting floors:
 
 ```csharp
-var floorConfigs = new List<FloorConfig<RoomType>>();
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
 
-for (int floor = 1; floor <= 5; floor++)
+public enum RoomType
 {
-    var config = new FloorConfig<RoomType>
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Create templates (shared across floors)
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+// Floor 0: Entry floor
+var floor0Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 10,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    RoomRequirements = new[]
     {
-        Seed = 1000 + floor,  // Different seed per floor
-        RoomCount = 10 + floor * 2,  // Increasing difficulty
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 2)
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new NotOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 0 }),  // No boss on floor 0
+        new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+        new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
+    },
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+// Floor 1: Middle floor
+var floor1Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 12,  // More rooms
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 3)
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new NotOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 1 }),  // No boss on floor 1
+        new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+        new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 3)
+    },
+    BranchingFactor = 0.35f,  // Slightly more complex
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+// Floor 2: Final floor with boss
+var floor2Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,  // Most rooms
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    RoomRequirements = new[]
+    {
+        (RoomType.Treasure, 2)
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 }),  // Boss only on floor 2
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 8),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+        new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
+    },
+    BranchingFactor = 0.4f,  // Most complex
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+// Define connections between floors
+var connections = new[]
+{
+    // Stairs from floor 0 to floor 1 (down)
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 9,  // Last room on floor 0
+        ToFloorIndex = 1,
+        ToRoomNodeId = 0,   // First room on floor 1
+        Type = ConnectionType.StairsDown
+    },
+    // Stairs from floor 1 to floor 2 (down)
+    new FloorConnection
+    {
+        FromFloorIndex = 1,
+        FromRoomNodeId = 11,  // Last room on floor 1
+        ToFloorIndex = 2,
+        ToRoomNodeId = 0,     // First room on floor 2
+        Type = ConnectionType.StairsDown
+    },
+    // Teleporter from floor 0 to floor 2 (skip floor 1)
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 5,
+        ToFloorIndex = 2,
+        ToRoomNodeId = 7,
+        Type = ConnectionType.Teleporter
+    }
+};
+
+// Create multi-floor configuration
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config, floor2Config },
+    Connections = connections
+};
+
+// Generate multi-floor dungeon
+var generator = new MultiFloorGenerator<RoomType>();
+var multiFloorLayout = generator.Generate(multiFloorConfig);
+
+// Access results
+Console.WriteLine($"Generated {multiFloorLayout.TotalFloorCount} floors");
+Console.WriteLine($"Seed: {multiFloorLayout.Seed}");
+
+foreach (var floor in multiFloorLayout.Floors)
+{
+    Console.WriteLine($"Floor has {floor.Rooms.Count} rooms");
+    Console.WriteLine($"  Spawn: {floor.SpawnRoomId}, Boss: {floor.BossRoomId}");
+}
+
+foreach (var connection in multiFloorLayout.Connections)
+{
+    Console.WriteLine($"Connection: Floor {connection.FromFloorIndex} Room {connection.FromRoomNodeId} -> " +
+                     $"Floor {connection.ToFloorIndex} Room {connection.ToRoomNodeId} ({connection.Type})");
+}
+```
+
+### Progressive Difficulty Multi-Floor
+
+Example with increasing difficulty on each floor:
+
+```csharp
+var templates = CreateTemplates();
+
+var floorConfigs = new List<FloorConfig<RoomType>>();
+var connections = new List<FloorConnection>();
+
+for (int floorIndex = 0; floorIndex < 5; floorIndex++)
+{
+    var floorConfig = new FloorConfig<RoomType>
+    {
+        Seed = 12345,
+        RoomCount = 8 + (floorIndex * 2),  // 8, 10, 12, 14, 16 rooms
         SpawnRoomType = RoomType.Spawn,
         BossRoomType = RoomType.Boss,
         DefaultRoomType = RoomType.Combat,
         Templates = templates,
-        BranchingFactor = 0.2f + (floor * 0.05f),  // More complex each floor
+        Constraints = new List<IConstraint<RoomType>>
+        {
+            // Boss only on final floor
+            new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 4 })
+        },
+        BranchingFactor = 0.2f + (floorIndex * 0.05f),  // Increasing complexity
         HallwayMode = HallwayMode.AsNeeded
     };
     
-    floorConfigs.Add(config);
+    floorConfigs.Add(floorConfig);
+    
+    // Connect to next floor (except last floor)
+    if (floorIndex < 4)
+    {
+        connections.Add(new FloorConnection
+        {
+            FromFloorIndex = floorIndex,
+            FromRoomNodeId = floorConfig.RoomCount - 1,  // Last room
+            ToFloorIndex = floorIndex + 1,
+            ToRoomNodeId = 0,  // First room on next floor
+            Type = ConnectionType.StairsDown
+        });
+    }
 }
 
-var generator = new FloorGenerator<RoomType>();
-var floors = floorConfigs.Select(c => generator.Generate(c)).ToList();
-
-Console.WriteLine($"Generated {floors.Count} floors");
-foreach (var floor in floors)
+var multiFloorConfig = new MultiFloorConfig<RoomType>
 {
-    Console.WriteLine($"Floor has {floor.Rooms.Count} rooms");
-}
+    Seed = 12345,
+    Floors = floorConfigs,
+    Connections = connections
+};
+
+var generator = new MultiFloorGenerator<RoomType>();
+var layout = generator.Generate(multiFloorConfig);
 ```
 
 ## Rendering Example

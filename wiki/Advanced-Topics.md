@@ -495,9 +495,157 @@ public static void PrintDungeon(FloorLayout<RoomType> layout)
 }
 ```
 
+## Multi-Floor Dungeons
+
+The library supports generating multi-floor dungeons with vertical connections between floors via stairs and teleporters.
+
+### Basic Multi-Floor Generation
+
+```csharp
+var floor0Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 10,
+    // ... other config
+};
+
+var floor1Config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 12,
+    // ... other config
+};
+
+var connections = new[]
+{
+    new FloorConnection
+    {
+        FromFloorIndex = 0,
+        FromRoomNodeId = 9,
+        ToFloorIndex = 1,
+        ToRoomNodeId = 0,
+        Type = ConnectionType.StairsDown
+    }
+};
+
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config },
+    Connections = connections
+};
+
+var generator = new MultiFloorGenerator<RoomType>();
+var layout = generator.Generate(multiFloorConfig);
+```
+
+### Floor-Aware Constraints
+
+Use floor-aware constraints to control room placement per floor:
+
+```csharp
+var floor0Constraints = new List<IConstraint<RoomType>>
+{
+    // Boss not on floor 0
+    new NotOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 0 })
+};
+
+var floor2Constraints = new List<IConstraint<RoomType>>
+{
+    // Boss only on floor 2
+    new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 2 })
+};
+```
+
+### Connection Types
+
+Three connection types are available:
+
+- **StairsUp** - Visual stairs going up to a higher floor
+- **StairsDown** - Visual stairs going down to a lower floor  
+- **Teleporter** - Teleporter pad/portal connecting floors (can skip floors)
+
+### Progressive Difficulty
+
+Create progressive difficulty by increasing complexity on deeper floors:
+
+```csharp
+for (int floorIndex = 0; floorIndex < 5; floorIndex++)
+{
+    var floorConfig = new FloorConfig<RoomType>
+    {
+        Seed = 12345,
+        RoomCount = 8 + (floorIndex * 2),  // More rooms on deeper floors
+        BranchingFactor = 0.2f + (floorIndex * 0.05f),  // More complex
+        Constraints = new List<IConstraint<RoomType>>
+        {
+            new OnlyOnFloorConstraint<RoomType>(RoomType.Boss, new[] { 4 })
+        }
+        // ...
+    };
+}
+```
+
+### Connection Planning
+
+Plan connections carefully - room node IDs must exist on their floors:
+
+```csharp
+// ❌ Bad: Room ID might not exist
+var connection = new FloorConnection
+{
+    FromRoomNodeId = 999,  // Might not exist!
+    // ...
+};
+
+// ✅ Good: Use known room IDs
+var floor0 = generator.Generate(floor0Config);
+var connection = new FloorConnection
+{
+    FromRoomNodeId = floor0.BossRoomId,  // Known to exist
+    // ...
+};
+```
+
+### Determinism
+
+Multi-floor generation is deterministic - same seed produces identical layout:
+
+```csharp
+var config1 = CreateMultiFloorConfig(seed: 12345);
+var config2 = CreateMultiFloorConfig(seed: 12345);
+
+var generator = new MultiFloorGenerator<RoomType>();
+var layout1 = generator.Generate(config1);
+var layout2 = generator.Generate(config2);
+
+// Layouts are identical
+Assert.Equal(layout1.TotalFloorCount, layout2.TotalFloorCount);
+```
+
+### Backward Compatibility
+
+Single-floor generation still works unchanged:
+
+```csharp
+// Still works - no changes needed
+var singleFloorConfig = new FloorConfig<RoomType> { /* ... */ };
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(singleFloorConfig);
+```
+
+### Best Practices
+
+1. **Use floor-aware constraints** - Control room placement per floor
+2. **Plan connections** - Know room IDs before creating connections
+3. **Progressive difficulty** - Increase complexity on deeper floors
+4. **Test determinism** - Verify same seed produces same layout
+5. **Validate connections** - Ensure room IDs exist on their floors
+
 ## Next Steps
 
 - **[Best Practices](Best-Practices)** - Apply these patterns
 - **[API Reference](API-Reference)** - Complete API documentation
-- **[Examples](Examples)** - See advanced patterns in action
+- **[Examples](Examples)** - See advanced patterns in action, including multi-floor examples
+- **[Configuration](Configuration)** - Learn about MultiFloorConfig
 
