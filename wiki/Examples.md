@@ -536,6 +536,137 @@ This example demonstrates:
 - **Secret away from Boss**: Secret rooms are hidden at least 3 steps from boss rooms
 - **Multiple reference types**: Can specify multiple reference types (e.g., "within 2 steps of Combat OR Boss")
 
+## Critical Path Ordering Constraints
+
+Example using `MustComeBeforeConstraint` to enforce ordering on the critical path:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, MiniBoss, Shop, KeyItem
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("miniboss")
+        .ForRoomTypes(RoomType.MiniBoss)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("keyitem")
+        .ForRoomTypes(RoomType.KeyItem)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Mini-boss must come before Boss on critical path
+    new MustComeBeforeConstraint<RoomType>(RoomType.MiniBoss, RoomType.Boss),
+    new OnlyOnCriticalPathConstraint<RoomType>(RoomType.MiniBoss),
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.MiniBoss, 3),
+    
+    // Shop must come before Boss OR MiniBoss (at least one)
+    new MustComeBeforeConstraint<RoomType>(
+        RoomType.Shop, 
+        RoomType.Boss, 
+        RoomType.MiniBoss
+    ),
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 5),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    
+    // Key item must come before Boss (progression gate)
+    new MustComeBeforeConstraint<RoomType>(RoomType.KeyItem, RoomType.Boss),
+    new OnlyOnCriticalPathConstraint<RoomType>(RoomType.KeyItem),
+    new MaxPerFloorConstraint<RoomType>(RoomType.KeyItem, 1)
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.MiniBoss, 1),
+        (RoomType.Shop, 1),
+        (RoomType.KeyItem, 1)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Verify ordering constraints are satisfied
+var criticalPath = layout.CriticalPath;
+var miniBossIndex = criticalPath.IndexOf(
+    layout.Rooms.First(r => r.RoomType == RoomType.MiniBoss).NodeId
+);
+var bossIndex = criticalPath.IndexOf(layout.BossRoomId);
+var shopIndex = criticalPath.IndexOf(
+    layout.Rooms.First(r => r.RoomType == RoomType.Shop).NodeId
+);
+var keyItemIndex = criticalPath.IndexOf(
+    layout.Rooms.First(r => r.RoomType == RoomType.KeyItem).NodeId
+);
+
+Console.WriteLine($"Critical path ordering:");
+Console.WriteLine($"  MiniBoss at index {miniBossIndex}, Boss at index {bossIndex}");
+Console.WriteLine($"  Shop at index {shopIndex}");
+Console.WriteLine($"  KeyItem at index {keyItemIndex}, Boss at index {bossIndex}");
+
+// Verify constraints
+Assert.True(miniBossIndex < bossIndex, "MiniBoss must come before Boss");
+Assert.True(shopIndex < bossIndex || shopIndex < miniBossIndex, "Shop must come before Boss or MiniBoss");
+Assert.True(keyItemIndex < bossIndex, "KeyItem must come before Boss");
+```
+
+This example demonstrates:
+- **Mini-boss before Boss**: Mini-boss must appear before the final boss on the critical path
+- **Shop before Boss or MiniBoss**: Shop must come before at least one of them (OR logic)
+- **Key item before Boss**: Key item acts as a progression gate that must be encountered before the boss
+- **Critical path ordering**: Ensures players encounter content in the intended sequence
+
 ## Linear Dungeon
 
 Minimal branching for a linear progression:

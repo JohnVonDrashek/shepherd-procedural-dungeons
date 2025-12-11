@@ -404,6 +404,60 @@ new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Shop, 1)
 - Works correctly with partially assigned graphs (only checks already-assigned reference rooms)
 - If target and reference are the same type, allows clustering within the specified distance
 
+### MustComeBeforeConstraint
+
+Ensures a room type must appear before another room type (or types) on the critical path (the shortest path from spawn to boss).
+
+```csharp
+// Single reference type
+new MustComeBeforeConstraint<RoomType>(
+    RoomType.MiniBoss, 
+    RoomType.Boss
+)
+
+// Multiple reference types (target must come before at least one)
+new MustComeBeforeConstraint<RoomType>(
+    RoomType.Shop,
+    RoomType.Boss,
+    RoomType.MiniBoss
+)
+```
+
+**Use case:** Enforce ordering constraints on the critical path. Common scenarios include:
+- Mini-boss must appear before the final boss
+- Shop must appear before boss or mini-boss
+- Key items must be encountered before certain encounters
+- Create progression gates and ordering requirements
+
+**Important:** This constraint operates on the **critical path** (spawn-to-boss shortest path), not the full graph. It ensures that when room types are assigned, the target room type is only placed on nodes that come before the reference room type(s) on the critical path.
+
+**Example:**
+```csharp
+// Mini-boss must come before Boss on critical path
+new MustComeBeforeConstraint<RoomType>(RoomType.MiniBoss, RoomType.Boss)
+
+// Shop must come before Boss OR MiniBoss (at least one)
+new MustComeBeforeConstraint<RoomType>(
+    RoomType.Shop, 
+    RoomType.Boss, 
+    RoomType.MiniBoss
+)
+
+// Key item room must come before final boss
+new MustComeBeforeConstraint<RoomType>(RoomType.KeyItem, RoomType.Boss)
+```
+
+**Behavior:**
+- Checks if the candidate node is on the critical path
+- If candidate is not on critical path: Returns `true` (permissive, allows placement off critical path)
+- If critical path is empty or not set: Returns `true` (permissive)
+- If reference room type(s) haven't been assigned yet: Returns `true` (permissive, allows assignment order flexibility)
+- If reference room types are assigned: Returns `true` only if candidate comes before at least one reference type on the critical path
+- Works correctly with partially assigned graphs (only checks already-assigned reference rooms)
+- The constraint is satisfied if the candidate comes before **any** of the reference types (OR logic for multiple references)
+
+**Note:** This constraint is particularly useful for game design patterns where certain encounters must happen in a specific order. Since the critical path represents the main progression route, this ensures players encounter content in the intended sequence.
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -473,7 +527,10 @@ var constraints = new List<IConstraint<RoomType>>
     // Secret room constraints
     new MinDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 3),  // Hidden from boss
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),
-    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret)
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret),
+    
+    // Mini-boss must come before Boss on critical path
+    new MustComeBeforeConstraint<RoomType>(RoomType.MiniBoss, RoomType.Boss)
 };
 ```
 
@@ -577,6 +634,16 @@ new MustBeDeadEndConstraint<RoomType>(RoomType.Secret)
 ```
 
 Secret rooms are hidden away (at least 3 steps from boss, at least 2 from spawn), optional, and in dead ends.
+
+### Mini-Boss Pattern (Ordering)
+
+```csharp
+new MustComeBeforeConstraint<RoomType>(RoomType.MiniBoss, RoomType.Boss),
+new OnlyOnCriticalPathConstraint<RoomType>(RoomType.MiniBoss),
+new MinDistanceFromStartConstraint<RoomType>(RoomType.MiniBoss, 3)
+```
+
+Mini-boss must appear before the final boss on the critical path, ensuring proper progression order.
 
 ## Troubleshooting Constraints
 

@@ -348,6 +348,22 @@ public class MaxDistanceFromRoomTypeConstraint<TRoomType> : IConstraint<TRoomTyp
 }
 ```
 
+#### MustComeBeforeConstraint
+
+```csharp
+public class MustComeBeforeConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ReferenceRoomTypes { get; }
+    
+    // Single reference type
+    public MustComeBeforeConstraint(TRoomType targetRoomType, TRoomType referenceRoomType);
+    
+    // Multiple reference types (target must come before at least one)
+    public MustComeBeforeConstraint(TRoomType targetRoomType, params TRoomType[] referenceRoomTypes);
+}
+```
+
 #### CustomConstraint
 
 ```csharp
