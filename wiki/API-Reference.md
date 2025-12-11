@@ -870,6 +870,143 @@ public bool RequiresHallway { get; }
 
 **RequiresHallway**: Returns `true` if this secret passage requires a hallway (rooms are not adjacent).
 
+## ConfigurationSerializer<TRoomType>
+
+Serializes and deserializes dungeon configurations to/from JSON.
+
+### Constructor
+
+```csharp
+public ConfigurationSerializer()
+```
+
+Creates a new configuration serializer with default options.
+
+### Methods
+
+#### SerializeToJson (FloorConfig)
+
+```csharp
+public string SerializeToJson(FloorConfig<TRoomType> config, bool prettyPrint = true)
+public string SerializeToJson(FloorConfig<TRoomType> config, JsonSerializerOptions options)
+```
+
+Serializes a `FloorConfig` to JSON string.
+
+**Parameters:**
+- `config` - The configuration to serialize
+- `prettyPrint` - Whether to format the JSON with indentation (default: true)
+- `options` - Custom JSON serializer options
+
+**Returns:** JSON string representation of the configuration
+
+#### DeserializeFromJson (FloorConfig)
+
+```csharp
+public FloorConfig<TRoomType> DeserializeFromJson(string json)
+public FloorConfig<TRoomType> DeserializeFromJson(string json, JsonSerializerOptions options)
+```
+
+Deserializes a JSON string to `FloorConfig`.
+
+**Parameters:**
+- `json` - The JSON string to deserialize
+- `options` - Custom JSON serializer options
+
+**Returns:** `FloorConfig<TRoomType>` instance
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
+
+#### SerializeToJson (MultiFloorConfig)
+
+```csharp
+public string SerializeToJson(MultiFloorConfig<TRoomType> config, bool prettyPrint = true)
+```
+
+Serializes a `MultiFloorConfig` to JSON string.
+
+**Parameters:**
+- `config` - The multi-floor configuration to serialize
+- `prettyPrint` - Whether to format the JSON with indentation (default: true)
+
+**Returns:** JSON string representation of the configuration
+
+#### DeserializeMultiFloorConfigFromJson
+
+```csharp
+public MultiFloorConfig<TRoomType> DeserializeMultiFloorConfigFromJson(string json)
+```
+
+Deserializes a JSON string to `MultiFloorConfig`.
+
+**Parameters:**
+- `json` - The JSON string to deserialize
+
+**Returns:** `MultiFloorConfig<TRoomType>` instance
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
+
+## ConfigurationSerializationExtensions
+
+Extension methods for convenient configuration serialization.
+
+### ToJson
+
+```csharp
+public static string ToJson<TRoomType>(this FloorConfig<TRoomType> config) where TRoomType : Enum
+```
+
+Serializes a `FloorConfig` to JSON string with pretty printing enabled.
+
+**Returns:** JSON string representation of the configuration
+
+### FromJson
+
+```csharp
+public static FloorConfig<TRoomType> FromJson<TRoomType>(string json) where TRoomType : Enum
+```
+
+Deserializes a JSON string to `FloorConfig`.
+
+**Parameters:**
+- `json` - The JSON string to deserialize
+
+**Returns:** `FloorConfig<TRoomType>` instance
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
+
+### SaveToFile
+
+```csharp
+public static void SaveToFile<TRoomType>(this FloorConfig<TRoomType> config, string filePath) where TRoomType : Enum
+```
+
+Saves a `FloorConfig` to a file as JSON.
+
+**Parameters:**
+- `config` - The configuration to save
+- `filePath` - Path to the file to save to
+
+### LoadFromFile
+
+```csharp
+public static FloorConfig<TRoomType> LoadFromFile<TRoomType>(string filePath) where TRoomType : Enum
+```
+
+Loads a `FloorConfig` from a JSON file.
+
+**Parameters:**
+- `filePath` - Path to the JSON file to load
+
+**Returns:** `FloorConfig<TRoomType>` instance
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
+- `FileNotFoundException` - Thrown when the file doesn't exist
+
 ## Namespaces
 
 - `ShepherdProceduralDungeons` - Main entry point
@@ -879,6 +1016,7 @@ public bool RequiresHallway { get; }
 - `ShepherdProceduralDungeons.Generation` - Generation algorithms
 - `ShepherdProceduralDungeons.Graph` - Graph structures
 - `ShepherdProceduralDungeons.Layout` - Output layout classes
+- `ShepherdProceduralDungeons.Serialization` - Serialization support
 - `ShepherdProceduralDungeons.Templates` - Template system
 
 ## See Also
@@ -886,6 +1024,6 @@ public bool RequiresHallway { get; }
 - **[Getting Started](Getting-Started)** - Learn the basics
 - **[Room Templates](Room-Templates)** - Template API details
 - **[Constraints](Constraints)** - Constraint API details
-- **[Configuration](Configuration)** - Config API details
+- **[Configuration](Configuration)** - Config API details, including serialization
 - **[Working with Output](Working-with-Output)** - Layout API details
 

@@ -762,6 +762,305 @@ The generator validates:
 - All room node IDs in connections exist on their floors
 - Connections connect different floors
 
+## Configuration Serialization
+
+Dungeon configurations can be serialized to and deserialized from JSON, enabling save/load functionality, sharing configurations, version control, and configuration editor tools.
+
+### Basic Serialization
+
+```csharp
+using ShepherdProceduralDungeons.Serialization;
+
+var config = new FloorConfig<RoomType>
+{
+    // ... configuration ...
+};
+
+// Serialize to JSON string
+var serializer = new ConfigurationSerializer<RoomType>();
+string json = serializer.SerializeToJson(config, prettyPrint: true);
+
+// Deserialize from JSON string
+var deserializedConfig = serializer.DeserializeFromJson(json);
+```
+
+### Extension Methods
+
+For convenience, extension methods are available:
+
+```csharp
+using ShepherdProceduralDungeons.Serialization;
+
+var config = new FloorConfig<RoomType> { /* ... */ };
+
+// Serialize to JSON
+string json = config.ToJson();
+
+// Deserialize from JSON
+var config = FloorConfig<RoomType>.FromJson<RoomType>(json);
+
+// Save to file
+config.SaveToFile("dungeon-config.json");
+
+// Load from file
+var config = FloorConfig<RoomType>.LoadFromFile<RoomType>("dungeon-config.json");
+```
+
+### Multi-Floor Serialization
+
+Multi-floor configurations can also be serialized:
+
+```csharp
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config },
+    Connections = connections
+};
+
+var serializer = new ConfigurationSerializer<RoomType>();
+string json = serializer.SerializeToJson(multiFloorConfig, prettyPrint: true);
+var deserialized = serializer.DeserializeMultiFloorConfigFromJson(json);
+```
+
+### JSON Format
+
+Configurations are serialized using camelCase property names. Here's an example JSON structure:
+
+```json
+{
+  "seed": 12345,
+  "roomCount": 15,
+  "spawnRoomType": "Spawn",
+  "bossRoomType": "Boss",
+  "defaultRoomType": "Combat",
+  "branchingFactor": 0.3,
+  "hallwayMode": "AsNeeded",
+  "roomRequirements": [
+    { "type": "Shop", "count": 1 },
+    { "type": "Treasure", "count": 2 }
+  ],
+  "templates": [
+    {
+      "id": "spawn-room",
+      "validRoomTypes": ["Spawn"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 3,
+        "height": 3
+      },
+      "doorEdges": {
+        "strategy": "allExteriorEdges"
+      }
+    },
+    {
+      "id": "boss-arena",
+      "validRoomTypes": ["Boss"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 6,
+        "height": 6
+      },
+      "doorEdges": {
+        "strategy": "sides",
+        "sides": ["South"]
+      }
+    },
+    {
+      "id": "l-shaped-combat",
+      "validRoomTypes": ["Combat"],
+      "weight": 0.5,
+      "shape": {
+        "type": "lShape",
+        "width": 5,
+        "height": 4,
+        "cutoutWidth": 2,
+        "cutoutHeight": 2,
+        "cutoutCorner": "TopRight"
+      },
+      "doorEdges": {
+        "strategy": "allExteriorEdges"
+      }
+    },
+    {
+      "id": "custom-shape",
+      "validRoomTypes": ["Treasure"],
+      "weight": 1.0,
+      "shape": {
+        "type": "custom",
+        "cells": [
+          { "x": 0, "y": 0 },
+          { "x": 1, "y": 0 },
+          { "x": 0, "y": 1 },
+          { "x": 1, "y": 1 },
+          { "x": 2, "y": 1 }
+        ]
+      },
+      "doorEdges": {
+        "strategy": "explicit",
+        "edges": {
+          "0,0": ["North", "West"],
+          "2,1": ["East"]
+        }
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "type": "MinDistanceFromStart",
+      "targetRoomType": "Boss",
+      "minDistance": 5
+    },
+    {
+      "type": "MustBeDeadEnd",
+      "targetRoomType": "Boss"
+    },
+    {
+      "type": "NotOnCriticalPath",
+      "targetRoomType": "Shop"
+    },
+    {
+      "type": "MaxPerFloor",
+      "targetRoomType": "Shop",
+      "maxCount": 1
+    }
+  ],
+  "zones": [
+    {
+      "id": "castle",
+      "name": "Castle",
+      "boundary": {
+        "type": "DistanceBased",
+        "minDistance": 0,
+        "maxDistance": 3
+      },
+      "roomRequirements": [
+        { "type": "Shop", "count": 1 }
+      ],
+      "templates": ["castle-template-id"]
+    }
+  ],
+  "secretPassageConfig": {
+    "count": 3,
+    "maxSpatialDistance": 5,
+    "allowedRoomTypes": ["Treasure"],
+    "forbiddenRoomTypes": ["Boss"],
+    "allowCriticalPathConnections": true,
+    "allowGraphConnectedRooms": false
+  }
+}
+```
+
+### Template Shapes
+
+Templates support three shape types in JSON:
+
+1. **Rectangle**: `{ "type": "rectangle", "width": 3, "height": 3 }`
+2. **L-Shape**: `{ "type": "lShape", "width": 5, "height": 4, "cutoutWidth": 2, "cutoutHeight": 2, "cutoutCorner": "TopRight" }`
+3. **Custom**: `{ "type": "custom", "cells": [{ "x": 0, "y": 0 }, ...] }`
+
+### Door Edge Strategies
+
+Door edges can be specified using three strategies:
+
+1. **All Exterior Edges**: `{ "strategy": "allExteriorEdges" }`
+2. **Sides**: `{ "strategy": "sides", "sides": ["North", "South"] }`
+3. **Explicit**: `{ "strategy": "explicit", "edges": { "0,0": ["North", "West"], "2,1": ["East"] } }`
+
+### Constraint Types
+
+All built-in constraint types are supported in JSON. Each constraint includes a `type` field and constraint-specific properties:
+
+- `MinDistanceFromStart`: `{ "type": "MinDistanceFromStart", "targetRoomType": "Boss", "minDistance": 5 }`
+- `MaxDistanceFromStart`: `{ "type": "MaxDistanceFromStart", "targetRoomType": "Shop", "maxDistance": 4 }`
+- `MustBeDeadEnd`: `{ "type": "MustBeDeadEnd", "targetRoomType": "Boss" }`
+- `NotOnCriticalPath`: `{ "type": "NotOnCriticalPath", "targetRoomType": "Treasure" }`
+- `OnlyOnCriticalPath`: `{ "type": "OnlyOnCriticalPath", "targetRoomType": "Boss" }`
+- `MinConnectionCount`: `{ "type": "MinConnectionCount", "targetRoomType": "Hub", "minConnections": 3 }`
+- `MaxConnectionCount`: `{ "type": "MaxConnectionCount", "targetRoomType": "Treasure", "maxConnections": 2 }`
+- `MaxPerFloor`: `{ "type": "MaxPerFloor", "targetRoomType": "Shop", "maxCount": 1 }`
+- `OnlyOnFloor`: `{ "type": "OnlyOnFloor", "targetRoomType": "Boss", "allowedFloors": [2] }`
+- `NotOnFloor`: `{ "type": "NotOnFloor", "targetRoomType": "Shop", "forbiddenFloors": [0] }`
+- `MinFloor`: `{ "type": "MinFloor", "targetRoomType": "Boss", "minFloor": 2 }`
+- `MaxFloor`: `{ "type": "MaxFloor", "targetRoomType": "Tutorial", "maxFloor": 0 }`
+- `MustBeAdjacentTo`: `{ "type": "MustBeAdjacentTo", "targetRoomType": "Shop", "requiredAdjacentTypes": ["Combat"] }`
+- `MustNotBeAdjacentTo`: `{ "type": "MustNotBeAdjacentTo", "targetRoomType": "Shop", "forbiddenAdjacentTypes": ["Shop"] }`
+- `MinDistanceFromRoomType`: `{ "type": "MinDistanceFromRoomType", "targetRoomType": "Secret", "referenceRoomTypes": ["Boss"], "minDistance": 3 }`
+- `MaxDistanceFromRoomType`: `{ "type": "MaxDistanceFromRoomType", "targetRoomType": "Shop", "referenceRoomTypes": ["Combat"], "maxDistance": 2 }`
+- `MustComeBefore`: `{ "type": "MustComeBefore", "targetRoomType": "MiniBoss", "referenceRoomTypes": ["Boss"] }`
+- `OnlyInZone`: `{ "type": "OnlyInZone", "targetRoomType": "Boss", "zoneId": "dungeon" }`
+- `CompositeConstraint`: `{ "type": "CompositeConstraint", "operator": "And", "constraints": [...] }`
+
+### Zone Boundaries
+
+Zone boundaries support two types:
+
+1. **Distance-Based**: `{ "type": "DistanceBased", "minDistance": 0, "maxDistance": 3 }`
+2. **Critical Path-Based**: `{ "type": "CriticalPathBased", "startPercent": 0.0, "endPercent": 0.5 }`
+
+### Error Handling
+
+Deserialization throws `InvalidConfigurationException` for:
+- Invalid JSON syntax
+- Missing required fields
+- Invalid enum values
+- Type mismatches
+
+```csharp
+try
+{
+    var config = serializer.DeserializeFromJson(json);
+}
+catch (InvalidConfigurationException ex)
+{
+    Console.WriteLine($"Invalid configuration: {ex.Message}");
+}
+```
+
+### Round-Trip Compatibility
+
+Serialization and deserialization are round-trip compatible - serializing a configuration and then deserializing it produces an identical configuration:
+
+```csharp
+var config = CreateConfig();
+var serializer = new ConfigurationSerializer<RoomType>();
+
+string json1 = serializer.SerializeToJson(config, prettyPrint: true);
+var deserialized = serializer.DeserializeFromJson(json1);
+string json2 = serializer.SerializeToJson(deserialized, prettyPrint: true);
+
+Assert.Equal(json1, json2);  // Identical JSON output
+```
+
+### Custom Options
+
+You can provide custom `JsonSerializerOptions`:
+
+```csharp
+var customOptions = new JsonSerializerOptions
+{
+    WriteIndented = false,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+};
+
+var serializer = new ConfigurationSerializer<RoomType>();
+string json = serializer.SerializeToJson(config, customOptions);
+var config = serializer.DeserializeFromJson(json, customOptions);
+```
+
+**Note**: Custom converters for complex types (Cell, Edge, ZoneBoundary, RoomTemplate, Constraint) are automatically added to ensure proper serialization.
+
+### Use Cases
+
+- **Save/Load**: Save dungeon presets to files and load them later
+- **Sharing**: Share configurations with team members or the community
+- **Version Control**: Track configuration changes over time
+- **Configuration Editors**: Build visual editors that work with JSON
+- **Preset Libraries**: Maintain libraries of dungeon presets
+- **Cross-Platform**: Share configurations between different game engines
+
 ## Next Steps
 
 - **[Constraints](Constraints)** - Understand constraint system, including floor-aware constraints

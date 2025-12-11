@@ -1863,10 +1863,322 @@ foreach (var floor in multiFloorLayout.Floors)
 }
 ```
 
+## Configuration Serialization Example
+
+Example of saving and loading dungeon configurations:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Serialization;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Create a configuration
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+// Save configuration to file
+config.SaveToFile("my-dungeon-config.json");
+
+// Load configuration from file
+var loadedConfig = FloorConfig<RoomType>.LoadFromFile<RoomType>("my-dungeon-config.json");
+
+// Generate dungeon with loaded config
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(loadedConfig);
+```
+
+### Serialization with Extension Methods
+
+```csharp
+// Serialize to JSON string
+string json = config.ToJson();
+Console.WriteLine(json);
+
+// Deserialize from JSON string
+var config = FloorConfig<RoomType>.FromJson<RoomType>(json);
+```
+
+### Using ConfigurationSerializer Directly
+
+```csharp
+var serializer = new ConfigurationSerializer<RoomType>();
+
+// Serialize with pretty printing
+string json = serializer.SerializeToJson(config, prettyPrint: true);
+
+// Serialize without pretty printing (compact)
+string compactJson = serializer.SerializeToJson(config, prettyPrint: false);
+
+// Deserialize
+var deserializedConfig = serializer.DeserializeFromJson(json);
+
+// Round-trip test
+string json1 = serializer.SerializeToJson(config, prettyPrint: true);
+var deserialized = serializer.DeserializeFromJson(json1);
+string json2 = serializer.SerializeToJson(deserialized, prettyPrint: true);
+Assert.Equal(json1, json2);  // Should be identical
+```
+
+### Multi-Floor Serialization
+
+```csharp
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config, floor2Config },
+    Connections = connections
+};
+
+var serializer = new ConfigurationSerializer<RoomType>();
+
+// Serialize multi-floor config
+string json = serializer.SerializeToJson(multiFloorConfig, prettyPrint: true);
+
+// Save to file manually
+File.WriteAllText("multi-floor-config.json", json);
+
+// Deserialize
+var loadedMultiFloorConfig = serializer.DeserializeMultiFloorConfigFromJson(json);
+
+// Generate multi-floor dungeon
+var generator = new MultiFloorGenerator<RoomType>();
+var layout = generator.Generate(loadedMultiFloorConfig);
+```
+
+### JSON Configuration Example
+
+Example of a complete JSON configuration file:
+
+```json
+{
+  "seed": 12345,
+  "roomCount": 15,
+  "spawnRoomType": "Spawn",
+  "bossRoomType": "Boss",
+  "defaultRoomType": "Combat",
+  "branchingFactor": 0.3,
+  "hallwayMode": "AsNeeded",
+  "roomRequirements": [
+    { "type": "Shop", "count": 1 },
+    { "type": "Treasure", "count": 2 }
+  ],
+  "templates": [
+    {
+      "id": "spawn-room",
+      "validRoomTypes": ["Spawn"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 3,
+        "height": 3
+      },
+      "doorEdges": {
+        "strategy": "allExteriorEdges"
+      }
+    },
+    {
+      "id": "boss-arena",
+      "validRoomTypes": ["Boss"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 6,
+        "height": 6
+      },
+      "doorEdges": {
+        "strategy": "sides",
+        "sides": ["South"]
+      }
+    },
+    {
+      "id": "combat-medium",
+      "validRoomTypes": ["Combat"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 4,
+        "height": 4
+      },
+      "doorEdges": {
+        "strategy": "allExteriorEdges"
+      }
+    },
+    {
+      "id": "shop",
+      "validRoomTypes": ["Shop"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 4,
+        "height": 3
+      },
+      "doorEdges": {
+        "strategy": "sides",
+        "sides": ["North", "South"]
+      }
+    },
+    {
+      "id": "treasure",
+      "validRoomTypes": ["Treasure"],
+      "weight": 1.0,
+      "shape": {
+        "type": "rectangle",
+        "width": 2,
+        "height": 2
+      },
+      "doorEdges": {
+        "strategy": "allExteriorEdges"
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "type": "MinDistanceFromStart",
+      "targetRoomType": "Boss",
+      "minDistance": 6
+    },
+    {
+      "type": "MustBeDeadEnd",
+      "targetRoomType": "Boss"
+    },
+    {
+      "type": "NotOnCriticalPath",
+      "targetRoomType": "Shop"
+    },
+    {
+      "type": "MaxPerFloor",
+      "targetRoomType": "Shop",
+      "maxCount": 1
+    },
+    {
+      "type": "NotOnCriticalPath",
+      "targetRoomType": "Treasure"
+    },
+    {
+      "type": "MustBeDeadEnd",
+      "targetRoomType": "Treasure"
+    }
+  ]
+}
+```
+
+### Error Handling
+
+```csharp
+try
+{
+    var config = FloorConfig<RoomType>.LoadFromFile<RoomType>("config.json");
+}
+catch (InvalidConfigurationException ex)
+{
+    Console.WriteLine($"Invalid configuration: {ex.Message}");
+    // Handle error - maybe show user-friendly message
+}
+catch (FileNotFoundException ex)
+{
+    Console.WriteLine($"Configuration file not found: {ex.Message}");
+    // Handle missing file
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"Invalid JSON: {ex.Message}");
+    // Handle JSON parsing errors
+}
+```
+
+### Building Configuration Presets
+
+Example of creating a preset library:
+
+```csharp
+public class DungeonPresetLibrary
+{
+    private readonly string _presetsDirectory;
+    
+    public DungeonPresetLibrary(string presetsDirectory)
+    {
+        _presetsDirectory = presetsDirectory;
+        Directory.CreateDirectory(_presetsDirectory);
+    }
+    
+    public void SavePreset(string name, FloorConfig<RoomType> config)
+    {
+        string filePath = Path.Combine(_presetsDirectory, $"{name}.json");
+        config.SaveToFile(filePath);
+    }
+    
+    public FloorConfig<RoomType> LoadPreset(string name)
+    {
+        string filePath = Path.Combine(_presetsDirectory, $"{name}.json");
+        return FloorConfig<RoomType>.LoadFromFile<RoomType>(filePath);
+    }
+    
+    public IEnumerable<string> ListPresets()
+    {
+        return Directory.GetFiles(_presetsDirectory, "*.json")
+            .Select(Path.GetFileNameWithoutExtension);
+    }
+}
+
+// Usage
+var library = new DungeonPresetLibrary("./presets");
+
+// Save a preset
+library.SavePreset("small-dungeon", smallConfig);
+library.SavePreset("large-dungeon", largeConfig);
+
+// List available presets
+foreach (var presetName in library.ListPresets())
+{
+    Console.WriteLine($"Available preset: {presetName}");
+}
+
+// Load and use a preset
+var config = library.LoadPreset("small-dungeon");
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
 ## Next Steps
 
 - **[Getting Started](Getting-Started)** - Learn the basics
 - **[Room Templates](Room-Templates)** - Create custom shapes
 - **[Constraints](Constraints)** - Control room placement
+- **[Configuration](Configuration)** - Learn about configuration serialization
 - **[Working with Output](Working-with-Output)** - Use generated layouts, including secret passages
 
