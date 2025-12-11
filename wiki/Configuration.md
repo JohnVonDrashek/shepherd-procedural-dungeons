@@ -1093,6 +1093,153 @@ The generator validates:
 - All room node IDs in connections exist on their floors
 - Connections connect different floors
 
+## Dungeon Themes and Presets
+
+Dungeon themes provide pre-configured dungeon generation setups for common roguelike scenarios. Themes encapsulate complete configurations (templates, constraints, algorithms, etc.) with metadata (name, description, tags) for easy discovery and reuse.
+
+### Using Built-in Themes
+
+The library includes several built-in themes accessible through `ThemePresetLibrary<TRoomType>`:
+
+```csharp
+using ShepherdProceduralDungeons.Configuration;
+
+// Get a theme by property
+var castle = ThemePresetLibrary<RoomType>.Castle;
+var cave = ThemePresetLibrary<RoomType>.Cave;
+var temple = ThemePresetLibrary<RoomType>.Temple;
+var laboratory = ThemePresetLibrary<RoomType>.Laboratory;
+var crypt = ThemePresetLibrary<RoomType>.Crypt;
+var forest = ThemePresetLibrary<RoomType>.Forest;
+
+// Get a theme by ID
+var theme = ThemePresetLibrary<RoomType>.GetTheme("castle");
+
+// Get all themes
+var allThemes = ThemePresetLibrary<RoomType>.GetAllThemes();
+
+// Get themes by tags
+var undergroundThemes = ThemePresetLibrary<RoomType>.GetThemesByTags("underground");
+var structuredThemes = ThemePresetLibrary<RoomType>.GetThemesByTags("structured", "indoor");
+```
+
+### Built-in Theme Characteristics
+
+Each built-in theme has specific characteristics:
+
+- **Castle**: Structured, grid-based layout with low branching factor. Tags: `structured`, `indoor`, `medieval`, `grid-based`
+- **Cave**: Organic, cellular automata layout with high branching factor. Tags: `organic`, `underground`, `natural`, `cave-like`
+- **Temple**: Structured, maze-based layout. Tags: `structured`, `indoor`, `religious`, `maze-like`
+- **Laboratory**: Structured, grid-based layout. Tags: `structured`, `indoor`, `scientific`, `grid-based`
+- **Crypt**: Underground, maze-based layout. Tags: `underground`, `maze-like`, `dark`, `tomb-like`
+- **Forest**: Organic, spanning tree layout. Tags: `organic`, `outdoor`, `natural`, `tree-like`
+
+### Converting Themes to FloorConfig
+
+Themes can be converted to `FloorConfig` with optional overrides:
+
+```csharp
+var theme = ThemePresetLibrary<RoomType>.Castle;
+
+// Use theme defaults
+var config = theme.ToFloorConfig();
+
+// Override specific properties
+var configWithOverrides = theme.ToFloorConfig(new ThemeOverrides
+{
+    Seed = 99999,
+    RoomCount = 20,
+    BranchingFactor = 0.5f,
+    HallwayMode = HallwayMode.Always,
+    GraphAlgorithm = GraphAlgorithm.CellularAutomata
+});
+```
+
+### Creating Custom Themes
+
+```csharp
+var baseConfig = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.GridBased,
+    GridBasedConfig = new GridBasedGraphConfig
+    {
+        GridWidth = 5,
+        GridHeight = 3,
+        ConnectivityPattern = ConnectivityPattern.FourWay
+    },
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+var customTheme = new DungeonTheme<RoomType>
+{
+    Id = "my-custom-theme",
+    Name = "My Custom Theme",
+    Description = "A custom theme for my game",
+    BaseConfig = baseConfig,
+    Tags = new HashSet<string> { "custom", "experimental" },
+    Zones = optionalZones  // Optional zone configurations
+};
+```
+
+### Theme Composition
+
+Themes can be combined, with the second theme taking precedence:
+
+```csharp
+var theme1 = ThemePresetLibrary<RoomType>.Castle;
+var theme2 = ThemePresetLibrary<RoomType>.Crypt;
+
+var combined = theme1.Combine(theme2);
+// Combined theme uses theme2's config but merges zones and tags
+```
+
+### Theme Validation
+
+Themes are validated when converting to `FloorConfig`:
+
+```csharp
+var theme = new DungeonTheme<RoomType>
+{
+    Id = "test-theme",
+    Name = "Test Theme",
+    BaseConfig = config
+};
+
+// Validation occurs here - throws InvalidConfigurationException if invalid
+var config = theme.ToFloorConfig();
+```
+
+**Validation checks:**
+- Theme ID and name must not be empty
+- Base configuration must be valid
+- All required properties must be present
+
+### Theme Serialization
+
+Themes support JSON serialization:
+
+```csharp
+using ShepherdProceduralDungeons.Serialization;
+
+var theme = ThemePresetLibrary<RoomType>.Castle;
+var serializer = new ConfigurationSerializer<RoomType>();
+
+// Serialize to JSON
+string json = serializer.SerializeThemeToJson(theme, prettyPrint: true);
+
+// Deserialize from JSON
+var loadedTheme = serializer.DeserializeThemeFromJson(json);
+```
+
+See [Examples](Examples#dungeon-themes-and-presets) for complete theme usage examples.
+
 ## Configuration Serialization
 
 Dungeon configurations can be serialized to and deserialized from JSON, enabling save/load functionality, sharing configurations, version control, and configuration editor tools.

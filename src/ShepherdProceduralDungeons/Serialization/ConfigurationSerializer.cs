@@ -145,6 +145,45 @@ public sealed class ConfigurationSerializer<TRoomType> where TRoomType : Enum
         }
     }
 
+    /// <summary>
+    /// Serializes a DungeonTheme to JSON string.
+    /// </summary>
+    /// <param name="theme">The theme to serialize.</param>
+    /// <param name="prettyPrint">Whether to format the JSON with indentation.</param>
+    /// <returns>A JSON string representation of the theme.</returns>
+    public string SerializeThemeToJson(DungeonTheme<TRoomType> theme, bool prettyPrint = true)
+    {
+        var options = prettyPrint ? CreatePrettyPrintOptions() : _defaultOptions;
+        return JsonSerializer.Serialize(theme, options);
+    }
+
+    /// <summary>
+    /// Deserializes a JSON string to DungeonTheme.
+    /// </summary>
+    /// <param name="json">The JSON string to deserialize.</param>
+    /// <returns>A DungeonTheme instance.</returns>
+    /// <exception cref="InvalidConfigurationException">Thrown when the JSON is invalid or missing required fields.</exception>
+    public DungeonTheme<TRoomType> DeserializeThemeFromJson(string json)
+    {
+        try
+        {
+            var theme = JsonSerializer.Deserialize<DungeonTheme<TRoomType>>(json, _defaultOptions);
+            if (theme == null)
+            {
+                throw new InvalidConfigurationException("Deserialized theme is null. Check that all required fields are present.");
+            }
+            return theme;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidConfigurationException($"Invalid JSON: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidConfigurationException($"Deserialization failed: {ex.Message}");
+        }
+    }
+
 
     private JsonSerializerOptions CreateDefaultOptions()
     {
@@ -182,6 +221,7 @@ public sealed class ConfigurationSerializer<TRoomType> where TRoomType : Enum
         options.Converters.Add(new JsonStringEnumConverter());
         options.Converters.Add(new TupleArrayJsonConverter<TRoomType>());
         options.Converters.Add(new ReadOnlySetJsonConverter<TRoomType>());
+        options.Converters.Add(new ReadOnlySetJsonConverter<string>());
     }
 
     private JsonSerializerOptions MergeOptions(JsonSerializerOptions customOptions)

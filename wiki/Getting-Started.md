@@ -192,6 +192,35 @@ var (min, max) = layout.GetBounds();
 Console.WriteLine($"Bounds: ({min.X}, {min.Y}) to ({max.X}, {max.Y})");
 ```
 
+## Quick Start with Themes
+
+For even faster setup, you can use built-in dungeon themes:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Use a built-in theme
+var castleTheme = ThemePresetLibrary<RoomType>.Castle;
+var config = castleTheme.ToFloorConfig(new ThemeOverrides 
+{ 
+    Seed = 12345, 
+    RoomCount = 12 
+});
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+Console.WriteLine($"Generated {layout.Rooms.Count} rooms with Castle theme");
+```
+
+Themes include pre-configured templates, constraints, and algorithms. See [Examples](Examples#dungeon-themes-and-presets) for more theme usage examples.
+
 ## Complete Example
 
 Here's a complete, runnable example:

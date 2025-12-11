@@ -3046,11 +3046,210 @@ var options = new AsciiRenderOptions
 string optimizedMap = renderer.Render(layout, options);
 ```
 
+## Dungeon Themes and Presets
+
+Example using built-in dungeon themes for quick generation:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Quick generation with a preset theme
+var castleTheme = ThemePresetLibrary<RoomType>.Castle;
+var config = castleTheme.ToFloorConfig(new ThemeOverrides 
+{ 
+    Seed = 12345, 
+    RoomCount = 15 
+});
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+Console.WriteLine($"Generated {layout.Rooms.Count} rooms with Castle theme");
+```
+
+### Using Different Built-in Themes
+
+```csharp
+// Castle - structured, grid-based layout
+var castle = ThemePresetLibrary<RoomType>.Castle;
+var castleConfig = castle.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+
+// Cave - organic, cellular automata layout
+var cave = ThemePresetLibrary<RoomType>.Cave;
+var caveConfig = cave.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+
+// Temple - structured, maze-like layout
+var temple = ThemePresetLibrary<RoomType>.Temple;
+var templeConfig = temple.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+
+// Laboratory - structured, grid-based layout
+var laboratory = ThemePresetLibrary<RoomType>.Laboratory;
+var laboratoryConfig = laboratory.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+
+// Crypt - underground, maze-like layout
+var crypt = ThemePresetLibrary<RoomType>.Crypt;
+var cryptConfig = crypt.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+
+// Forest - organic, spanning tree layout
+var forest = ThemePresetLibrary<RoomType>.Forest;
+var forestConfig = forest.ToFloorConfig(new ThemeOverrides { Seed = 12345, RoomCount = 15 });
+```
+
+### Finding Themes by Tags
+
+```csharp
+// Get all underground themes
+var undergroundThemes = ThemePresetLibrary<RoomType>.GetThemesByTags("underground");
+// Returns: Cave, Crypt
+
+// Get all structured themes
+var structuredThemes = ThemePresetLibrary<RoomType>.GetThemesByTags("structured", "indoor");
+// Returns: Castle, Temple, Laboratory
+
+// Get all themes
+var allThemes = ThemePresetLibrary<RoomType>.GetAllThemes();
+foreach (var theme in allThemes)
+{
+    Console.WriteLine($"{theme.Name} ({theme.Id}): {theme.Description}");
+}
+```
+
+### Custom Theme Creation
+
+```csharp
+// Create a custom theme
+var customConfig = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    GraphAlgorithm = GraphAlgorithm.GridBased,
+    GridBasedConfig = new GridBasedGraphConfig
+    {
+        GridWidth = 5,
+        GridHeight = 3,
+        ConnectivityPattern = ConnectivityPattern.FourWay
+    },
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+var customTheme = new DungeonTheme<RoomType>
+{
+    Id = "my-custom-theme",
+    Name = "My Custom Theme",
+    Description = "A custom theme for my game",
+    BaseConfig = customConfig,
+    Tags = new HashSet<string> { "custom", "experimental", "structured" }
+};
+
+// Use the custom theme
+var config = customTheme.ToFloorConfig(new ThemeOverrides { Seed = 99999 });
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+### Theme Composition
+
+```csharp
+// Combine themes (other theme takes precedence)
+var castle = ThemePresetLibrary<RoomType>.Castle;
+var crypt = ThemePresetLibrary<RoomType>.Crypt;
+
+var combinedTheme = castle.Combine(crypt);
+// Combined theme uses crypt's config but merges zones and tags
+
+var config = combinedTheme.ToFloorConfig();
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+### Theme Overrides
+
+```csharp
+var theme = ThemePresetLibrary<RoomType>.Castle;
+
+// Override specific properties
+var config = theme.ToFloorConfig(new ThemeOverrides
+{
+    Seed = 99999,              // Override seed
+    RoomCount = 20,            // Override room count
+    BranchingFactor = 0.5f,    // Override branching factor
+    HallwayMode = HallwayMode.Always,  // Override hallway mode
+    GraphAlgorithm = GraphAlgorithm.CellularAutomata  // Override algorithm
+});
+
+// Other properties (templates, constraints, etc.) come from the theme
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+### Theme Serialization
+
+```csharp
+using ShepherdProceduralDungeons.Serialization;
+
+var theme = ThemePresetLibrary<RoomType>.Castle;
+var serializer = new ConfigurationSerializer<RoomType>();
+
+// Serialize theme to JSON
+string json = serializer.SerializeThemeToJson(theme, prettyPrint: true);
+Console.WriteLine(json);
+
+// Save to file
+File.WriteAllText("castle-theme.json", json);
+
+// Deserialize theme from JSON
+var loadedTheme = serializer.DeserializeThemeFromJson(json);
+
+// Use the loaded theme
+var config = loadedTheme.ToFloorConfig();
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+### Theme Round-Trip Serialization
+
+```csharp
+var theme = ThemePresetLibrary<RoomType>.Castle;
+var serializer = new ConfigurationSerializer<RoomType>();
+
+// Serialize
+string json1 = serializer.SerializeThemeToJson(theme, prettyPrint: true);
+
+// Deserialize
+var deserialized = serializer.DeserializeThemeFromJson(json1);
+
+// Serialize again
+string json2 = serializer.SerializeThemeToJson(deserialized, prettyPrint: true);
+
+// Should be identical
+Assert.Equal(json1, json2);
+```
+
+This example demonstrates:
+- **Quick generation**: Use built-in themes for instant dungeon generation
+- **Theme discovery**: Find themes by tags (underground, structured, etc.)
+- **Custom themes**: Create your own themes with custom configurations
+- **Theme composition**: Combine multiple themes
+- **Overrides**: Customize specific aspects of themes
+- **Serialization**: Save and load themes as JSON
+
 ## Next Steps
 
 - **[Getting Started](Getting-Started)** - Learn the basics
 - **[Room Templates](Room-Templates)** - Create custom shapes
 - **[Constraints](Constraints)** - Control room placement
-- **[Configuration](Configuration)** - Learn about configuration serialization
+- **[Configuration](Configuration)** - Learn about configuration serialization and themes
 - **[Working with Output](Working-with-Output)** - Use generated layouts, including secret passages and visualization
 

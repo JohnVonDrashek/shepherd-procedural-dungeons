@@ -1312,16 +1312,187 @@ public enum AsciiRenderStyle
 
 **Compact**: Optimized for small terminal windows.
 
+## DungeonTheme<TRoomType>
+
+Represents a complete dungeon theme with all generation parameters and metadata.
+
+### Properties
+
+```csharp
+public required string Id { get; init; }
+public required string Name { get; init; }
+public string? Description { get; init; }
+public required FloorConfig<TRoomType> BaseConfig { get; init; }
+public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }
+public IReadOnlySet<string> Tags { get; init; }
+```
+
+**Id**: Unique identifier for this theme (e.g., "castle", "cave").
+
+**Name**: Display name for this theme (e.g., "Castle", "Cave").
+
+**Description**: Optional description of this theme's characteristics.
+
+**BaseConfig**: Base floor configuration for this theme.
+
+**Zones**: Optional zone configurations for this theme.
+
+**Tags**: Tags for categorizing themes (e.g., "underground", "structured", "organic").
+
+### Methods
+
+#### ToFloorConfig
+
+```csharp
+public FloorConfig<TRoomType> ToFloorConfig(ThemeOverrides? overrides = null)
+```
+
+Creates a `FloorConfig` from this theme with optional overrides.
+
+**Parameters:**
+- `overrides` - Optional overrides for specific properties (seed, room count, branching factor, etc.)
+
+**Returns:** `FloorConfig<TRoomType>` - Configuration ready for generation
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when theme or resulting config is invalid
+
+#### Combine
+
+```csharp
+public DungeonTheme<TRoomType> Combine(DungeonTheme<TRoomType> other)
+```
+
+Creates a new theme by combining this theme with another (other takes precedence).
+
+**Parameters:**
+- `other` - Theme to combine with (takes precedence for config and properties)
+
+**Returns:** `DungeonTheme<TRoomType>` - Combined theme with merged zones and tags
+
+## ThemePresetLibrary<TRoomType>
+
+Library of built-in dungeon themes.
+
+### Static Properties
+
+```csharp
+public static DungeonTheme<TRoomType> Castle { get; }
+public static DungeonTheme<TRoomType> Cave { get; }
+public static DungeonTheme<TRoomType> Temple { get; }
+public static DungeonTheme<TRoomType> Laboratory { get; }
+public static DungeonTheme<TRoomType> Crypt { get; }
+public static DungeonTheme<TRoomType> Forest { get; }
+```
+
+Access built-in themes directly via properties.
+
+### Static Methods
+
+#### GetTheme
+
+```csharp
+public static DungeonTheme<TRoomType>? GetTheme(string themeId)
+```
+
+Gets a built-in theme by ID.
+
+**Parameters:**
+- `themeId` - Theme identifier (case-insensitive, e.g., "castle", "CAVE")
+
+**Returns:** `DungeonTheme<TRoomType>?` - Theme if found, null otherwise
+
+#### GetAllThemes
+
+```csharp
+public static IReadOnlyList<DungeonTheme<TRoomType>> GetAllThemes()
+```
+
+Gets all built-in themes.
+
+**Returns:** `IReadOnlyList<DungeonTheme<TRoomType>>` - List of all built-in themes
+
+#### GetThemesByTags
+
+```csharp
+public static IReadOnlyList<DungeonTheme<TRoomType>> GetThemesByTags(params string[] tags)
+```
+
+Gets themes matching the specified tags.
+
+**Parameters:**
+- `tags` - Tags to match (case-insensitive, OR logic - matches if theme has any tag)
+
+**Returns:** `IReadOnlyList<DungeonTheme<TRoomType>>` - Themes matching at least one tag
+
+## ThemeOverrides
+
+Allows overriding specific aspects of a theme when converting to FloorConfig.
+
+### Properties
+
+```csharp
+public int? Seed { get; init; }
+public int? RoomCount { get; init; }
+public float? BranchingFactor { get; init; }
+public HallwayMode? HallwayMode { get; init; }
+public GraphAlgorithm? GraphAlgorithm { get; init; }
+```
+
+**Seed**: Override the seed value.
+
+**RoomCount**: Override the room count.
+
+**BranchingFactor**: Override the branching factor.
+
+**HallwayMode**: Override the hallway mode.
+
+**GraphAlgorithm**: Override the graph algorithm.
+
+**Note**: Only specified properties override the theme's base config. Unspecified properties use theme defaults.
+
+## ConfigurationSerializer Theme Methods
+
+### SerializeThemeToJson
+
+```csharp
+public string SerializeThemeToJson(DungeonTheme<TRoomType> theme, bool prettyPrint = true)
+```
+
+Serializes a `DungeonTheme` to JSON string.
+
+**Parameters:**
+- `theme` - The theme to serialize
+- `prettyPrint` - Whether to format the JSON with indentation (default: true)
+
+**Returns:** JSON string representation of the theme
+
+### DeserializeThemeFromJson
+
+```csharp
+public DungeonTheme<TRoomType> DeserializeThemeFromJson(string json)
+```
+
+Deserializes a JSON string to `DungeonTheme`.
+
+**Parameters:**
+- `json` - The JSON string to deserialize
+
+**Returns:** `DungeonTheme<TRoomType>` instance
+
+**Exceptions:**
+- `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
+
 ## Namespaces
 
 - `ShepherdProceduralDungeons` - Main entry point
-- `ShepherdProceduralDungeons.Configuration` - Configuration classes
+- `ShepherdProceduralDungeons.Configuration` - Configuration classes, including themes
 - `ShepherdProceduralDungeons.Constraints` - Constraint system
 - `ShepherdProceduralDungeons.Exceptions` - Exception classes
 - `ShepherdProceduralDungeons.Generation` - Generation algorithms
 - `ShepherdProceduralDungeons.Graph` - Graph structures
 - `ShepherdProceduralDungeons.Layout` - Output layout classes
-- `ShepherdProceduralDungeons.Serialization` - Serialization support
+- `ShepherdProceduralDungeons.Serialization` - Serialization support, including theme serialization
 - `ShepherdProceduralDungeons.Templates` - Template system
 - `ShepherdProceduralDungeons.Visualization` - ASCII visualization system
 
