@@ -294,6 +294,191 @@ This example demonstrates:
 - **Treasure adjacent to Boss or Combat**: Rewards are near challenging content
 - **Rest adjacent to Combat**: Safe rooms are accessible after fights
 
+## Room Clustering Example
+
+This example demonstrates the room clustering system, which automatically identifies and groups spatially adjacent rooms of the same type into clusters. This enables gameplay patterns like bazaar areas (shops cluster together), gauntlet areas (combat rooms cluster), and treasure vaults (treasure rooms cluster together).
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Templates
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+// Configuration with clustering enabled
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 20,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    
+    // Enable clustering
+    ClusterConfig = new ClusterConfig<RoomType>
+    {
+        Enabled = true,
+        Epsilon = 20.0,        // Rooms within 20 cells can cluster
+        MinClusterSize = 2,   // At least 2 rooms per cluster
+        MaxClusterSize = 6,   // Maximum 6 rooms per cluster
+        RoomTypesToCluster = new HashSet<RoomType> 
+        { 
+            RoomType.Shop, 
+            RoomType.Treasure 
+        }  // Only cluster shops and treasure
+    },
+    
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 4),      // 4 shops (will form bazaar)
+        (RoomType.Treasure, 5)   // 5 treasure rooms (will form vaults)
+    },
+    
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        // Boss constraints
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 8),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+        
+        // Shop clustering constraints
+        new MustFormClusterConstraint<RoomType>(RoomType.Shop),
+        new MinClusterSizeConstraint<RoomType>(RoomType.Shop, 3),  // Bazaar needs at least 3 shops
+        new MaxClusterSizeConstraint<RoomType>(RoomType.Shop, 6),  // But not more than 6
+        
+        // Treasure clustering constraints
+        new MustFormClusterConstraint<RoomType>(RoomType.Treasure),
+        new MinClusterSizeConstraint<RoomType>(RoomType.Treasure, 2),  // Vaults need at least 2
+        new MaxClusterSizeConstraint<RoomType>(RoomType.Treasure, 5)   // But not more than 5
+    },
+    
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded
+};
+
+// Generate dungeon
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Access clusters
+Console.WriteLine("=== Shop Clusters (Bazaar Areas) ===");
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+Console.WriteLine($"Found {shopClusters.Count} shop cluster(s)");
+
+foreach (var cluster in shopClusters)
+{
+    Console.WriteLine($"\nCluster {cluster.ClusterId}:");
+    Console.WriteLine($"  Size: {cluster.GetSize()} shops");
+    Console.WriteLine($"  Centroid: ({cluster.Centroid.X}, {cluster.Centroid.Y})");
+    Console.WriteLine($"  Bounding box: ({cluster.BoundingBox.Min.X}, {cluster.BoundingBox.Min.Y}) to ({cluster.BoundingBox.Max.X}, {cluster.BoundingBox.Max.Y})");
+    Console.WriteLine($"  Average distance: {cluster.GetAverageDistance():F2} cells");
+    Console.WriteLine($"  Shops:");
+    foreach (var room in cluster.Rooms)
+    {
+        Console.WriteLine($"    Room {room.NodeId} at ({room.Position.X}, {room.Position.Y})");
+    }
+}
+
+var largestShopCluster = layout.GetLargestCluster(RoomType.Shop);
+if (largestShopCluster != null)
+{
+    Console.WriteLine($"\nLargest shop cluster: {largestShopCluster.GetSize()} shops");
+}
+
+Console.WriteLine("\n=== Treasure Clusters (Vaults) ===");
+var treasureClusters = layout.GetClustersForRoomType(RoomType.Treasure);
+Console.WriteLine($"Found {treasureClusters.Count} treasure cluster(s)");
+
+foreach (var cluster in treasureClusters)
+{
+    Console.WriteLine($"\nCluster {cluster.ClusterId}:");
+    Console.WriteLine($"  Size: {cluster.GetSize()} treasure rooms");
+    Console.WriteLine($"  Centroid: ({cluster.Centroid.X}, {cluster.Centroid.Y})");
+    Console.WriteLine($"  Rooms:");
+    foreach (var room in cluster.Rooms)
+    {
+        Console.WriteLine($"    Room {room.NodeId} at ({room.Position.X}, {room.Position.Y})");
+    }
+}
+
+// Game integration example
+Console.WriteLine("\n=== Game Integration ===");
+
+// Check if player is in a bazaar area
+var playerRoomId = 5;
+var playerRoom = layout.GetRoom(playerRoomId);
+
+if (playerRoom.RoomType == RoomType.Shop)
+{
+    var shopClustersForPlayer = layout.GetClustersForRoomType(RoomType.Shop);
+    var playerCluster = shopClustersForPlayer.FirstOrDefault(c => c.ContainsRoom(playerRoomId));
+    
+    if (playerCluster != null)
+    {
+        Console.WriteLine($"Player is in bazaar area (cluster {playerCluster.ClusterId})");
+        Console.WriteLine($"Bazaar has {playerCluster.GetSize()} shops - applying bazaar bonus!");
+        // ApplyBazaarBonus();  // Discounts, special items, etc.
+    }
+}
+
+// Find largest treasure vault
+var largestTreasureCluster = layout.GetLargestCluster(RoomType.Treasure);
+if (largestTreasureCluster != null && largestTreasureCluster.GetSize() >= 3)
+{
+    Console.WriteLine($"Found treasure vault with {largestTreasureCluster.GetSize()} rooms!");
+    Console.WriteLine($"Vault centroid: ({largestTreasureCluster.Centroid.X}, {largestTreasureCluster.Centroid.Y})");
+    // EnableVaultMechanics(largestTreasureCluster);
+}
+```
+
+**Key Points:**
+- Clustering is configured via `ClusterConfig` in `FloorConfig`
+- `Epsilon` controls how close rooms must be to cluster (20.0 cells in this example)
+- `MinClusterSize` filters out isolated rooms (at least 2 rooms per cluster)
+- `MaxClusterSize` prevents clusters from becoming too large (max 6 shops, max 5 treasure)
+- `RoomTypesToCluster` filters which room types to cluster (only shops and treasure)
+- Cluster-aware constraints (`MustFormClusterConstraint`, `MinClusterSizeConstraint`, `MaxClusterSizeConstraint`) ensure clusters meet requirements
+- Clusters are accessed via `layout.Clusters`, `layout.GetClustersForRoomType()`, and `layout.GetLargestCluster()`
+- Clustering enables gameplay mechanics like bazaar bonuses, gauntlet areas, and treasure vaults
+
 ## Connection Count Constraints
 
 Example using connection count constraints to control room connectivity:

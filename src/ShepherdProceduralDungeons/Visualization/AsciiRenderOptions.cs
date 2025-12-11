@@ -71,4 +71,14 @@ public sealed class AsciiRenderOptions
     /// Maximum width/height before auto-scaling or viewport is required.
     /// </summary>
     public (int MaxWidth, int MaxHeight)? MaxSize { get; init; } = (120, 40);
+
+    /// <summary>
+    /// Whether to show cluster boundaries.
+    /// </summary>
+    public bool ShowClusterBoundaries { get; init; } = false;
+
+    /// <summary>
+    /// Whether to show cluster IDs.
+    /// </summary>
+    public bool ShowClusterIds { get; init; } = false;
 }

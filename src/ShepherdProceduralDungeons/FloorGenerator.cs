@@ -244,7 +244,20 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             }
         }
 
-        // 11. Build output
+        // 11. Detect clusters (if enabled)
+        IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomCluster<TRoomType>>> clusters = 
+            new Dictionary<TRoomType, IReadOnlyList<RoomCluster<TRoomType>>>();
+        
+        if (config.ClusterConfig != null && config.ClusterConfig.Enabled)
+        {
+            // Apply max cluster size constraints to cluster config
+            var clusterConfig = ApplyClusterConstraints(config.ClusterConfig, config.Constraints);
+            
+            var clusterDetector = new ClusterDetector<TRoomType>();
+            clusters = clusterDetector.DetectClusters(placedRooms, clusterConfig);
+        }
+
+        // 12. Build output
         return new FloorLayout<TRoomType>
         {
             Rooms = placedRooms,
@@ -256,7 +269,8 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             BossRoomId = graph.BossNodeId,
             ZoneAssignments = zoneAssignments,
             TransitionRooms = transitionRooms,
-            SecretPassages = secretPassages
+            SecretPassages = secretPassages,
+            Clusters = clusters
         };
     }
 
@@ -947,6 +961,41 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             int k = rng.Next(n + 1);
             (list[k], list[n]) = (list[n], list[k]);
         }
+    }
+
+    private ClusterConfig<TRoomType> ApplyClusterConstraints(
+        ClusterConfig<TRoomType> baseConfig,
+        IReadOnlyList<Constraints.IConstraint<TRoomType>> constraints)
+    {
+        // Check for MaxClusterSizeConstraint and apply to config
+        int? maxClusterSize = baseConfig.MaxClusterSize;
+        
+        foreach (var constraint in constraints)
+        {
+            if (constraint is Constraints.MaxClusterSizeConstraint<TRoomType> maxSizeConstraint)
+            {
+                // If multiple constraints exist, use the minimum max size
+                if (!maxClusterSize.HasValue || maxSizeConstraint.MaxSize < maxClusterSize.Value)
+                {
+                    maxClusterSize = maxSizeConstraint.MaxSize;
+                }
+            }
+        }
+
+        // Return new config with updated max cluster size if changed
+        if (maxClusterSize != baseConfig.MaxClusterSize)
+        {
+            return new ClusterConfig<TRoomType>
+            {
+                Enabled = baseConfig.Enabled,
+                Epsilon = baseConfig.Epsilon,
+                MinClusterSize = baseConfig.MinClusterSize,
+                MaxClusterSize = maxClusterSize,
+                RoomTypesToCluster = baseConfig.RoomTypesToCluster
+            };
+        }
+
+        return baseConfig;
     }
 }
 

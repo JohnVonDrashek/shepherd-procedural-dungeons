@@ -113,5 +113,31 @@ public sealed class FloorLayout<TRoomType> where TRoomType : Enum
     {
         return Rooms.ToDictionary(r => r.NodeId, r => r.Difficulty);
     }
+
+    /// <summary>
+    /// All detected room clusters, grouped by room type.
+    /// </summary>
+    public IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomCluster<TRoomType>>> Clusters { get; init; } = 
+        new Dictionary<TRoomType, IReadOnlyList<RoomCluster<TRoomType>>>();
+
+    /// <summary>
+    /// Gets all clusters for a specific room type.
+    /// </summary>
+    public IReadOnlyList<RoomCluster<TRoomType>> GetClustersForRoomType(TRoomType roomType)
+    {
+        return Clusters.TryGetValue(roomType, out var clusters) ? clusters : Array.Empty<RoomCluster<TRoomType>>();
+    }
+
+    /// <summary>
+    /// Gets the largest cluster for a specific room type, or null if no clusters exist.
+    /// </summary>
+    public RoomCluster<TRoomType>? GetLargestCluster(TRoomType roomType)
+    {
+        var clusters = GetClustersForRoomType(roomType);
+        if (clusters.Count == 0)
+            return null;
+
+        return clusters.OrderByDescending(c => c.GetSize()).First();
+    }
 }
 

@@ -474,6 +474,102 @@ new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
 
 See [Configuration](Configuration#difficultyconfig) and [Constraints](Constraints#difficulty-constraints) for details.
 
+## Room Clustering
+
+### What It Is
+
+Room clustering automatically identifies and groups spatially adjacent rooms of the same type into clusters. This enables powerful gameplay patterns like bazaar areas (shops cluster together), gauntlet areas (combat rooms cluster), and treasure vaults (treasure rooms cluster together).
+
+### Why Clustering Matters
+
+Current constraints work on **graph topology** (which rooms connect), but don't understand **spatial relationships**. Clustering bridges that gap, enabling spatial design patterns that are common in roguelike games but previously impossible to express.
+
+### How Clustering Works
+
+Clustering happens **after spatial placement** but **before final layout construction**:
+
+1. Rooms are placed in 2D space
+2. Clustering algorithm (DBSCAN-based) analyzes spatial positions
+3. Rooms of the same type that are spatially close are grouped into clusters
+4. Clusters are stored in `FloorLayout.Clusters`
+
+### Cluster Properties
+
+Each cluster contains:
+- **ClusterId** - Unique identifier for the cluster
+- **RoomType** - The room type of all rooms in the cluster
+- **Rooms** - List of all rooms belonging to the cluster
+- **Centroid** - Spatial center point of the cluster
+- **BoundingBox** - Bounding box of the cluster (Min, Max)
+
+### Clustering Algorithm
+
+The system uses a **complete-graph clustering algorithm** that ensures all pairs of rooms in a cluster are within the epsilon distance threshold. This is stricter than standard DBSCAN but produces more cohesive clusters.
+
+**Parameters:**
+- **Epsilon** - Maximum spatial distance (in cells) between rooms in the same cluster
+- **MinClusterSize** - Minimum number of rooms required to form a cluster
+- **MaxClusterSize** - Optional maximum cluster size limit
+
+### Spatial Distance Calculation
+
+Distance between rooms is calculated using **centroid distance**:
+- Each room's centroid is calculated from its world cells
+- Distance between centroids determines cluster membership
+- All pairs in a cluster must be within epsilon distance
+
+### Cluster-Aware Constraints
+
+Clustering enables new constraint types that require spatial information:
+- **MustFormClusterConstraint** - Room type must form at least one cluster
+- **MinClusterSizeConstraint** - Room type must form at least one cluster of size N
+- **MaxClusterSizeConstraint** - Room type clusters cannot exceed size N
+
+**Important:** These constraints cannot be fully validated during room type assignment since clustering happens after spatial placement. They serve as requirements that are validated post-generation.
+
+### Use Cases
+
+**Bazaar Areas:**
+```csharp
+// Shops must form at least one cluster of size 3+
+new MinClusterSizeConstraint<RoomType>(RoomType.Shop, 3)
+```
+
+**Combat Gauntlets:**
+```csharp
+// Combat rooms must form clusters (gauntlet areas)
+new MustFormClusterConstraint<RoomType>(RoomType.Combat)
+```
+
+**Treasure Vaults:**
+```csharp
+// Treasure rooms form clusters, but limit size
+new MustFormClusterConstraint<RoomType>(RoomType.Treasure),
+new MaxClusterSizeConstraint<RoomType>(RoomType.Treasure, 5)
+```
+
+### Configuration
+
+Clustering is configured via `ClusterConfig` in `FloorConfig`:
+- **Enabled** - Enable/disable clustering (default: true)
+- **Epsilon** - Max distance for cluster membership (default: 20.0 cells)
+- **MinClusterSize** - Minimum rooms per cluster (default: 2)
+- **MaxClusterSize** - Optional maximum cluster size (default: null, no limit)
+- **RoomTypesToCluster** - Optional filter for which room types to cluster (null = all types)
+
+### Determinism
+
+Clustering is **deterministic** - same seed + same config = identical clusters. The algorithm processes rooms in a consistent order and produces reproducible results.
+
+### Performance
+
+- Clustering runs once per floor generation
+- Algorithm is O(n²) in worst case (all rooms checked against all rooms)
+- For large dungeons (100+ rooms), performance is acceptable
+- Cluster results are cached in `FloorLayout` to avoid recomputation
+
+See [Configuration](Configuration#clusterconfig) for cluster configuration details, [Constraints](Constraints#cluster-aware-constraints) for cluster-aware constraints, and [Working with Output](Working-with-Output#clusters) for accessing clusters in generated layouts.
+
 ## Generation Pipeline
 
 ```
@@ -497,7 +593,9 @@ See [Configuration](Configuration#difficultyconfig) and [Constraints](Constraint
    ↓
 10. Identify Transition Rooms (if zones configured)
    ↓
-11. Return FloorLayout
+11. Detect Clusters (if clustering enabled)
+   ↓
+12. Return FloorLayout
 ```
 
 ## Key Principles

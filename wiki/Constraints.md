@@ -623,6 +623,128 @@ var constraints = new List<IConstraint<RoomType>>
 };
 ```
 
+### MustFormClusterConstraint
+
+Requires the target room type to form at least one spatial cluster. This constraint enables gameplay patterns like bazaar areas (shops cluster together) or combat gauntlets (combat rooms cluster).
+
+```csharp
+new MustFormClusterConstraint<RoomType>(RoomType.Shop)
+```
+
+**Use case:** Ensure room types form spatial clusters for gameplay mechanics. Common scenarios include:
+- Shops must cluster together (bazaar areas)
+- Combat rooms must cluster (gauntlet areas)
+- Treasure rooms must cluster (treasure vaults)
+
+**Important:** This constraint cannot be fully validated during room type assignment since clustering happens after spatial placement. It serves as a requirement that will be validated post-generation. If clustering is disabled or no clusters are detected, generation will succeed but the constraint requirement may not be met.
+
+**Example:**
+```csharp
+// Shops must form at least one cluster (bazaar area)
+new MustFormClusterConstraint<RoomType>(RoomType.Shop)
+
+// Combat rooms must cluster (gauntlet areas)
+new MustFormClusterConstraint<RoomType>(RoomType.Combat)
+
+// Treasure rooms must cluster (treasure vaults)
+new MustFormClusterConstraint<RoomType>(RoomType.Treasure)
+```
+
+**Behavior:**
+- Always returns `true` during room type assignment (cannot validate clustering at that stage)
+- Clustering is validated post-generation by checking that clusters exist
+- Requires `ClusterConfig.Enabled = true` in `FloorConfig` for clusters to be detected
+- Works with `MinClusterSizeConstraint` and `MaxClusterSizeConstraint` for fine-grained control
+
+### MinClusterSizeConstraint
+
+Requires the target room type to form at least one cluster of the specified minimum size.
+
+```csharp
+new MinClusterSizeConstraint<RoomType>(
+    RoomType.Shop, 
+    minSize: 3
+)
+```
+
+**Use case:** Ensure room types form clusters of a specific minimum size. Common scenarios include:
+- Shops must form a bazaar with at least 3 shops
+- Combat rooms must form gauntlets with at least 5 rooms
+- Treasure rooms must form vaults with at least 2 rooms
+
+**Important:** This constraint cannot be fully validated during room type assignment since clustering happens after spatial placement. It serves as a requirement that will be validated post-generation. If clustering is disabled or clusters don't meet the minimum size, generation will succeed but the constraint requirement may not be met.
+
+**Example:**
+```csharp
+// Shops must form at least one cluster of size 3+ (bazaar)
+new MinClusterSizeConstraint<RoomType>(RoomType.Shop, 3)
+
+// Combat rooms must form at least one cluster of size 5+ (gauntlet)
+new MinClusterSizeConstraint<RoomType>(RoomType.Combat, 5)
+
+// Treasure rooms must form at least one cluster of size 2+
+new MinClusterSizeConstraint<RoomType>(RoomType.Treasure, 2)
+```
+
+**Behavior:**
+- Always returns `true` during room type assignment (cannot validate clustering at that stage)
+- Clustering is validated post-generation by checking that at least one cluster meets the minimum size
+- Requires `ClusterConfig.Enabled = true` in `FloorConfig` for clusters to be detected
+- Throws `ArgumentException` if `minSize < 1`
+- Works with `MustFormClusterConstraint` and `MaxClusterSizeConstraint` for fine-grained control
+
+### MaxClusterSizeConstraint
+
+Requires the target room type clusters to not exceed the specified maximum size.
+
+```csharp
+new MaxClusterSizeConstraint<RoomType>(
+    RoomType.Shop, 
+    maxSize: 5
+)
+```
+
+**Use case:** Prevent room types from forming clusters that are too large. Common scenarios include:
+- Shops can cluster but not exceed 5 shops (prevent mega-bazaars)
+- Combat rooms can cluster but limit gauntlet size
+- Treasure rooms can cluster but prevent massive vaults
+
+**Important:** This constraint cannot be fully validated during room type assignment since clustering happens after spatial placement. It serves as a requirement that will be validated post-generation. If clustering is disabled or clusters exceed the maximum size, generation will succeed but the constraint requirement may not be met.
+
+**Example:**
+```csharp
+// Shops can cluster but not exceed 5 shops
+new MaxClusterSizeConstraint<RoomType>(RoomType.Shop, 5)
+
+// Combat rooms can cluster but limit gauntlet size to 8
+new MaxClusterSizeConstraint<RoomType>(RoomType.Combat, 8)
+
+// Treasure rooms can cluster but prevent massive vaults (max 4)
+new MaxClusterSizeConstraint<RoomType>(RoomType.Treasure, 4)
+```
+
+**Behavior:**
+- Always returns `true` during room type assignment (cannot validate clustering at that stage)
+- Clustering is validated post-generation by checking that no clusters exceed the maximum size
+- Requires `ClusterConfig.Enabled = true` in `FloorConfig` for clusters to be detected
+- Throws `ArgumentException` if `maxSize < 1`
+- Works with `MustFormClusterConstraint` and `MinClusterSizeConstraint` for fine-grained control
+
+**Combining Cluster Constraints:**
+
+You can combine cluster constraints for precise control:
+
+```csharp
+// Shops must form clusters of size 3-5 (bazaar with size limits)
+new MustFormClusterConstraint<RoomType>(RoomType.Shop),
+new MinClusterSizeConstraint<RoomType>(RoomType.Shop, 3),
+new MaxClusterSizeConstraint<RoomType>(RoomType.Shop, 5)
+
+// Combat rooms must form at least one large gauntlet (5+ rooms)
+new MustFormClusterConstraint<RoomType>(RoomType.Combat),
+new MinClusterSizeConstraint<RoomType>(RoomType.Combat, 5)
+```
+
 ### MustComeBeforeConstraint
 
 Ensures a room type must appear before another room type (or types) on the critical path (the shortest path from spawn to boss).

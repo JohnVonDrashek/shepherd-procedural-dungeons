@@ -176,30 +176,54 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         Cell end = GetAdjacentCell(endCell, endEdge);
 
         // Calculate adaptive search radius based on distance between rooms
+        // For large dungeons, we need a larger search radius to find paths around obstacles
         int manhattanDist = Math.Abs(start.X - end.X) + Math.Abs(start.Y - end.Y);
-        int adaptiveSearchRadius = Math.Max(5, Math.Min(manhattanDist / 2, 15)); // Between 5 and 15
+        // Increase max radius from 15 to 30 for large dungeons, and scale better with distance
+        int adaptiveSearchRadius = Math.Max(5, Math.Min(manhattanDist / 2, 30)); // Between 5 and 30
 
         // If the start cell is occupied (inside another room), find an alternative
+        // Try with increasing radius if first attempt fails
         if (occupied.Contains(start))
         {
             var alternativeStart = FindNearestUnoccupiedCell(start, occupied, maxSearchRadius: adaptiveSearchRadius);
+            if (!alternativeStart.HasValue)
+            {
+                // Try with progressively larger radii up to 50 cells
+                for (int radius = adaptiveSearchRadius + 5; radius <= 50; radius += 5)
+                {
+                    alternativeStart = FindNearestUnoccupiedCell(start, occupied, maxSearchRadius: radius);
+                    if (alternativeStart.HasValue)
+                        break;
+                }
+            }
             if (alternativeStart.HasValue)
             {
 #if DEBUG
-                Console.WriteLine($"[DEBUG] Start cell {start} is occupied, using alternative start: {alternativeStart.Value} (radius: {adaptiveSearchRadius})");
+                Console.WriteLine($"[DEBUG] Start cell {start} is occupied, using alternative start: {alternativeStart.Value}");
 #endif
                 start = alternativeStart.Value;
             }
         }
 
         // If the end cell is occupied (inside another room), try to find an alternative end point
+        // Try with increasing radius if first attempt fails
         if (occupied.Contains(end))
         {
             var alternativeEnd = FindNearestUnoccupiedCell(end, occupied, maxSearchRadius: adaptiveSearchRadius);
+            if (!alternativeEnd.HasValue)
+            {
+                // Try with progressively larger radii up to 50 cells
+                for (int radius = adaptiveSearchRadius + 5; radius <= 50; radius += 5)
+                {
+                    alternativeEnd = FindNearestUnoccupiedCell(end, occupied, maxSearchRadius: radius);
+                    if (alternativeEnd.HasValue)
+                        break;
+                }
+            }
             if (alternativeEnd.HasValue)
             {
 #if DEBUG
-                Console.WriteLine($"[DEBUG] End cell {end} is occupied, using alternative end: {alternativeEnd.Value} (radius: {adaptiveSearchRadius})");
+                Console.WriteLine($"[DEBUG] End cell {end} is occupied, using alternative end: {alternativeEnd.Value}");
 #endif
                 end = alternativeEnd.Value;
             }
@@ -229,7 +253,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             // Check if we've gone too far
             int distance = Math.Abs(current.X - target.X) + Math.Abs(current.Y - target.Y);
             if (distance > maxSearchRadius)
-                break; // No point continuing if we've exceeded radius
+                continue; // Skip this cell but continue searching neighbors that are still within radius
 
             // If this cell is unoccupied, use it
             if (!occupied.Contains(current))
@@ -241,7 +265,12 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
                 if (!visited.Contains(neighbor))
                 {
                     visited.Add(neighbor);
-                    queue.Enqueue(neighbor);
+                    // Only enqueue if within radius
+                    int neighborDistance = Math.Abs(neighbor.X - target.X) + Math.Abs(neighbor.Y - target.Y);
+                    if (neighborDistance <= maxSearchRadius)
+                    {
+                        queue.Enqueue(neighbor);
+                    }
                 }
             }
         }
@@ -279,8 +308,11 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         Console.WriteLine($"[DEBUG] A* initialized: openSet.Count={openSet.Count}, startPriority={ManhattanDistance(start, end)}");
 #endif
 
-        // Limit exploration to prevent infinite loops (10,000 nodes should be enough for reasonable dungeons)
-        const int maxNodesExplored = 10000;
+        // Limit exploration to prevent infinite loops
+        // For large dungeons, increase the limit based on distance
+        int manhattanDist = ManhattanDistance(start, end);
+        // Base limit of 10,000, but increase for large distances (up to 50,000 for very large dungeons)
+        int maxNodesExplored = Math.Min(10000 + (manhattanDist * 100), 50000);
 
         while (openSet.Count > 0)
         {
@@ -384,10 +416,26 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
                 if (closedSet.Contains(neighbor))
                     continue;
 
+                // Skip occupied cells unless it's the end
                 if (occupied.Contains(neighbor) && neighbor != end)
                     continue;
 
-                int tentativeG = gScore[current] + 1;
+                // Calculate cost: base cost of 1, but add penalty if adjacent to occupied cells
+                // This helps find paths around obstacles in dense dungeons
+                int baseCost = 1;
+                int penalty = 0;
+                
+                // Check if this neighbor is adjacent to any occupied cells (except the end)
+                foreach (var adjacent in GetNeighbors(neighbor))
+                {
+                    if (occupied.Contains(adjacent) && adjacent != end)
+                    {
+                        penalty += 2; // Small penalty for being near obstacles
+                        break; // Only count once per neighbor
+                    }
+                }
+
+                int tentativeG = gScore[current] + baseCost + penalty;
 
                 if (!gScore.ContainsKey(neighbor) || tentativeG < gScore[neighbor])
                 {

@@ -643,6 +643,213 @@ public void OnWallInteraction(int roomId, Cell position)
 - Secret passages can optionally exclude graph-connected or critical path rooms
 - Secret passages are generated **deterministically** based on seed
 
+## Clusters
+
+Room clusters are groups of spatially adjacent rooms of the same type. Clustering enables gameplay patterns like bazaar areas (shops cluster together), gauntlet areas (combat rooms cluster), and treasure vaults (treasure rooms cluster together).
+
+### Accessing Clusters
+
+```csharp
+// Get all clusters (grouped by room type)
+var allClusters = layout.Clusters;
+
+// Get clusters for a specific room type
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+
+// Get the largest cluster for a room type
+var largestShopCluster = layout.GetLargestCluster(RoomType.Shop);
+```
+
+### Iterating Clusters
+
+```csharp
+// Iterate all clusters for all room types
+foreach (var (roomType, clusters) in layout.Clusters)
+{
+    Console.WriteLine($"Found {clusters.Count} clusters of type {roomType}:");
+    
+    foreach (var cluster in clusters)
+    {
+        Console.WriteLine($"  Cluster {cluster.ClusterId}: {cluster.GetSize()} rooms");
+        Console.WriteLine($"    Centroid: ({cluster.Centroid.X}, {cluster.Centroid.Y})");
+        Console.WriteLine($"    Bounding box: ({cluster.BoundingBox.Min.X}, {cluster.BoundingBox.Min.Y}) to ({cluster.BoundingBox.Max.X}, {cluster.BoundingBox.Max.Y})");
+    }
+}
+```
+
+### Cluster Properties
+
+```csharp
+var cluster = layout.GetClustersForRoomType(RoomType.Shop)[0];
+
+// Basic info
+int clusterId = cluster.ClusterId;
+RoomType roomType = cluster.RoomType;
+int size = cluster.GetSize();  // Number of rooms in cluster
+
+// Spatial properties
+Cell centroid = cluster.Centroid;  // Spatial center point
+var (min, max) = cluster.BoundingBox;  // Bounding box
+
+// Rooms in cluster
+foreach (var room in cluster.Rooms)
+{
+    Console.WriteLine($"  Room {room.NodeId} at ({room.Position.X}, {room.Position.Y})");
+}
+
+// Check if a room is in this cluster
+bool containsRoom = cluster.ContainsRoom(roomId);
+
+// Average distance between rooms in cluster
+double avgDistance = cluster.GetAverageDistance();
+```
+
+### Finding Clusters for a Room
+
+```csharp
+// Find which cluster(s) a room belongs to
+var roomId = 5;
+var room = layout.GetRoom(roomId);
+
+// Check all clusters for this room type
+var clusters = layout.GetClustersForRoomType(room.RoomType);
+var roomClusters = clusters.Where(c => c.ContainsRoom(roomId)).ToList();
+
+if (roomClusters.Any())
+{
+    Console.WriteLine($"Room {roomId} is in {roomClusters.Count} cluster(s)");
+    foreach (var cluster in roomClusters)
+    {
+        Console.WriteLine($"  Cluster {cluster.ClusterId} has {cluster.GetSize()} rooms");
+    }
+}
+else
+{
+    Console.WriteLine($"Room {roomId} is not in any cluster (isolated)");
+}
+```
+
+### Cluster Statistics
+
+```csharp
+// Get cluster statistics for a room type
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+
+if (shopClusters.Any())
+{
+    var stats = new
+    {
+        ClusterCount = shopClusters.Count,
+        TotalRooms = shopClusters.Sum(c => c.GetSize()),
+        LargestClusterSize = shopClusters.Max(c => c.GetSize()),
+        SmallestClusterSize = shopClusters.Min(c => c.GetSize()),
+        AverageClusterSize = shopClusters.Average(c => c.GetSize()),
+        LargestCluster = layout.GetLargestCluster(RoomType.Shop)
+    };
+    
+    Console.WriteLine($"Shop clusters: {stats.ClusterCount}");
+    Console.WriteLine($"Total shops in clusters: {stats.TotalRooms}");
+    Console.WriteLine($"Largest cluster: {stats.LargestClusterSize} shops");
+    Console.WriteLine($"Average cluster size: {stats.AverageClusterSize:F1} shops");
+}
+```
+
+### Rendering Clusters
+
+```csharp
+// Render cluster boundaries or highlight clusters
+foreach (var (roomType, clusters) in layout.Clusters)
+{
+    foreach (var cluster in clusters)
+    {
+        // Render bounding box
+        var (min, max) = cluster.BoundingBox;
+        for (int x = min.X; x <= max.X; x++)
+        {
+            RenderClusterBoundary(x, min.Y, roomType);
+            RenderClusterBoundary(x, max.Y, roomType);
+        }
+        for (int y = min.Y; y <= max.Y; y++)
+        {
+            RenderClusterBoundary(min.X, y, roomType);
+            RenderClusterBoundary(max.X, y, roomType);
+        }
+        
+        // Highlight rooms in cluster
+        foreach (var room in cluster.Rooms)
+        {
+            HighlightRoom(room.NodeId, GetClusterColor(cluster.ClusterId));
+        }
+        
+        // Render centroid marker
+        RenderMarker(cluster.Centroid.X, cluster.Centroid.Y, $"C{cluster.ClusterId}");
+    }
+}
+```
+
+### Game Integration
+
+Clusters enable various gameplay mechanics:
+
+**Bazaar Areas (Shops):**
+```csharp
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+if (shopClusters.Any())
+{
+    var bazaar = shopClusters[0];
+    // Apply bazaar bonus when player is in bazaar area
+    if (bazaar.Rooms.Any(r => IsPlayerInRoom(r.NodeId)))
+    {
+        ApplyBazaarBonus();  // Discounts, special items, etc.
+    }
+}
+```
+
+**Combat Gauntlets:**
+```csharp
+var combatClusters = layout.GetClustersForRoomType(RoomType.Combat);
+var largestGauntlet = layout.GetLargestCluster(RoomType.Combat);
+
+if (largestGauntlet != null && largestGauntlet.GetSize() >= 5)
+{
+    // Mark as "gauntlet area" - increased difficulty, better rewards
+    MarkAsGauntletArea(largestGauntlet);
+}
+```
+
+**Treasure Vaults:**
+```csharp
+var treasureClusters = layout.GetClustersForRoomType(RoomType.Treasure);
+foreach (var vault in treasureClusters)
+{
+    // Vaults contain multiple treasure rooms - special mechanics
+    if (vault.GetSize() >= 3)
+    {
+        EnableVaultMechanics(vault);
+    }
+}
+```
+
+**Cluster-Based Achievements:**
+```csharp
+// Achievement: "Bazaar Explorer" - visit all shops in a cluster
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+foreach (var cluster in shopClusters)
+{
+    if (cluster.Rooms.All(r => HasVisitedRoom(r.NodeId)))
+    {
+        UnlockAchievement("Bazaar Explorer");
+    }
+}
+```
+
+**Important Notes:**
+- Clusters are only available if `ClusterConfig.Enabled = true` in `FloorConfig`
+- Clusters are detected **after spatial placement** but **before final layout construction**
+- Clustering is **deterministic** - same seed produces identical clusters
+- Clusters are cached in `FloorLayout` to avoid recomputation
+- Isolated rooms (not in any cluster) are still valid - clustering is optional
+
 ## Statistics
 
 Calculate dungeon statistics:

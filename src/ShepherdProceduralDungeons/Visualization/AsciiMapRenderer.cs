@@ -198,6 +198,59 @@ public sealed class AsciiMapRenderer<TRoomType> where TRoomType : Enum
                 }
             }
         }
+
+        // Render cluster boundaries and IDs
+        if (options.ShowClusterBoundaries || options.ShowClusterIds)
+        {
+            foreach (var kvp in layout.Clusters)
+            {
+                foreach (var cluster in kvp.Value)
+                {
+                    if (options.ShowClusterBoundaries)
+                    {
+                        // Render bounding box outline
+                        var (bboxMin, bboxMax) = cluster.BoundingBox;
+                        for (int x = bboxMin.X; x <= bboxMax.X; x++)
+                        {
+                            var topCell = new Cell(x, bboxMin.Y);
+                            var bottomCell = new Cell(x, bboxMax.Y);
+                            if (IsInBounds(topCell, min, max))
+                            {
+                                RenderCell(grid, topCell, min, options.Scale, '#');
+                            }
+                            if (IsInBounds(bottomCell, min, max))
+                            {
+                                RenderCell(grid, bottomCell, min, options.Scale, '#');
+                            }
+                        }
+                        for (int y = bboxMin.Y; y <= bboxMax.Y; y++)
+                        {
+                            var leftCell = new Cell(bboxMin.X, y);
+                            var rightCell = new Cell(bboxMax.X, y);
+                            if (IsInBounds(leftCell, min, max))
+                            {
+                                RenderCell(grid, leftCell, min, options.Scale, '#');
+                            }
+                            if (IsInBounds(rightCell, min, max))
+                            {
+                                RenderCell(grid, rightCell, min, options.Scale, '#');
+                            }
+                        }
+                    }
+
+                    if (options.ShowClusterIds)
+                    {
+                        // Render cluster ID at centroid
+                        if (IsInBounds(cluster.Centroid, min, max))
+                        {
+                            // Use a character that represents the cluster ID (modulo 10 to get a digit)
+                            char clusterChar = (char)('0' + (cluster.ClusterId % 10));
+                            RenderCell(grid, cluster.Centroid, min, options.Scale, clusterChar);
+                        }
+                    }
+                }
+            }
+        }
         
         // Convert grid to string
         for (int y = 0; y < scaledHeight; y++)
@@ -238,7 +291,7 @@ public sealed class AsciiMapRenderer<TRoomType> where TRoomType : Enum
                 if (x >= 0 && x < grid.GetLength(1) && y >= 0 && y < grid.GetLength(0))
                 {
                     // Don't overwrite non-space characters unless it's a door or special feature
-                    if (grid[y, x] == ' ' || ch == '+' || ch == '~' || ch == '.' || IsInteriorFeatureChar(ch))
+                    if (grid[y, x] == ' ' || ch == '+' || ch == '~' || ch == '.' || ch == '#' || IsInteriorFeatureChar(ch) || char.IsDigit(ch))
                     {
                         grid[y, x] = ch;
                     }
@@ -339,6 +392,13 @@ public sealed class AsciiMapRenderer<TRoomType> where TRoomType : Enum
             usedSymbols.Add('~');
             symbolDescriptions['~'] = "~ = Secret Passage";
         }
+
+        // Add cluster boundary symbol if used
+        if (options.ShowClusterBoundaries && layout.Clusters.Count > 0)
+        {
+            usedSymbols.Add('#');
+            symbolDescriptions['#'] = "# = Cluster Boundary";
+        }
         
         // Add interior feature symbols if used
         if (options.ShowInteriorFeatures)
@@ -370,6 +430,23 @@ public sealed class AsciiMapRenderer<TRoomType> where TRoomType : Enum
             {
                 var symbol = GetRoomSymbol(room.RoomType, roomTypeSymbols);
                 builder.AppendLine($"  {symbol} = Room {room.NodeId}");
+            }
+        }
+
+        // Add cluster information if showing clusters
+        if (options.ShowClusterBoundaries || options.ShowClusterIds)
+        {
+            if (layout.Clusters.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Clusters:");
+                foreach (var kvp in layout.Clusters.OrderBy(k => k.Key.ToString()))
+                {
+                    foreach (var cluster in kvp.Value.OrderBy(c => c.ClusterId))
+                    {
+                        builder.AppendLine($"  Cluster {cluster.ClusterId}: {cluster.RoomType} ({cluster.GetSize()} rooms)");
+                    }
+                }
             }
         }
     }

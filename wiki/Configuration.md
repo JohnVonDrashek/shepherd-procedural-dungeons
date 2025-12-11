@@ -744,6 +744,166 @@ foreach (var room in layout.Rooms)
 
 See [Constraints](Constraints#difficulty-constraints) for details on difficulty-aware constraints.
 
+### ClusterConfig
+
+```csharp
+ClusterConfig = new ClusterConfig<RoomType>
+{
+    Enabled = true,
+    Epsilon = 20.0,
+    MinClusterSize = 2,
+    MaxClusterSize = null,
+    RoomTypesToCluster = null
+}
+```
+
+**Type:** `ClusterConfig<TRoomType>?`
+
+**Default:** `null` (clustering disabled)
+
+**Description:** Configuration for room clustering detection. Clustering automatically identifies and groups spatially adjacent rooms of the same type into clusters, enabling gameplay patterns like bazaar areas (shops cluster together), gauntlet areas (combat rooms cluster), and treasure vaults (treasure rooms cluster together).
+
+**Properties:**
+
+- **Enabled** (bool, default: true) - Whether clustering is enabled. Set to `false` to disable clustering entirely.
+- **Epsilon** (double, default: 20.0) - Maximum spatial distance (in cells) between rooms in the same cluster. Rooms further apart than this distance cannot be in the same cluster.
+- **MinClusterSize** (int, default: 2) - Minimum number of rooms required to form a cluster. Rooms that don't meet this minimum are considered "noise" and not grouped into clusters.
+- **MaxClusterSize** (int?, default: null) - Optional maximum number of rooms allowed in a cluster. If `null`, no maximum limit. If set, clusters will be limited to this size.
+- **RoomTypesToCluster** (IReadOnlySet<TRoomType>?, default: null) - Optional filter for which room types to cluster. If `null`, all room types are clustered. If set, only the specified room types will be clustered.
+
+**How Clustering Works:**
+
+Clustering happens **after spatial placement** but **before final layout construction**:
+
+1. Rooms are placed in 2D space
+2. Clustering algorithm analyzes spatial positions
+3. Rooms of the same type that are spatially close (within epsilon distance) are grouped into clusters
+4. Only clusters meeting the minimum size requirement are kept
+5. Clusters are stored in `FloorLayout.Clusters`
+
+**Clustering Algorithm:**
+
+The system uses a **complete-graph clustering algorithm** that ensures all pairs of rooms in a cluster are within the epsilon distance threshold. This produces more cohesive clusters than standard DBSCAN.
+
+**Distance Calculation:**
+
+Distance between rooms is calculated using **centroid distance**:
+- Each room's centroid is calculated from its world cells
+- Distance between centroids determines cluster membership
+- All pairs in a cluster must be within epsilon distance
+
+**Example - Basic Clustering:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    ClusterConfig = new ClusterConfig<RoomType>
+    {
+        Enabled = true,
+        Epsilon = 20.0,        // Rooms within 20 cells can cluster
+        MinClusterSize = 2     // At least 2 rooms per cluster
+    }
+};
+```
+
+**Example - Bazaar Area (Shops Cluster):**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    ClusterConfig = new ClusterConfig<RoomType>
+    {
+        Enabled = true,
+        Epsilon = 15.0,        // Shops within 15 cells cluster
+        MinClusterSize = 3,    // Bazaar needs at least 3 shops
+        MaxClusterSize = 6,    // But not more than 6 shops
+        RoomTypesToCluster = new HashSet<RoomType> { RoomType.Shop }  // Only cluster shops
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new MustFormClusterConstraint<RoomType>(RoomType.Shop),
+        new MinClusterSizeConstraint<RoomType>(RoomType.Shop, 3),
+        new MaxClusterSizeConstraint<RoomType>(RoomType.Shop, 6)
+    }
+};
+```
+
+**Example - Combat Gauntlets:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    ClusterConfig = new ClusterConfig<RoomType>
+    {
+        Enabled = true,
+        Epsilon = 25.0,        // Combat rooms within 25 cells cluster
+        MinClusterSize = 5,    // Gauntlets need at least 5 rooms
+        RoomTypesToCluster = new HashSet<RoomType> { RoomType.Combat }  // Only cluster combat
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new MustFormClusterConstraint<RoomType>(RoomType.Combat),
+        new MinClusterSizeConstraint<RoomType>(RoomType.Combat, 5)
+    }
+};
+```
+
+**Example - Multiple Room Types:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    ClusterConfig = new ClusterConfig<RoomType>
+    {
+        Enabled = true,
+        Epsilon = 20.0,
+        MinClusterSize = 2,
+        RoomTypesToCluster = new HashSet<RoomType> 
+        { 
+            RoomType.Shop, 
+            RoomType.Treasure 
+        }  // Cluster both shops and treasure
+    }
+};
+```
+
+**Accessing Clusters in Output:**
+
+After generation, clusters are available in `FloorLayout`:
+
+```csharp
+var layout = generator.Generate(config);
+
+// Get all clusters
+var allClusters = layout.Clusters;
+
+// Get clusters for a specific room type
+var shopClusters = layout.GetClustersForRoomType(RoomType.Shop);
+
+// Get the largest cluster for a room type
+var largestShopCluster = layout.GetLargestCluster(RoomType.Shop);
+if (largestShopCluster != null)
+{
+    Console.WriteLine($"Largest shop cluster has {largestShopCluster.GetSize()} shops");
+    Console.WriteLine($"Centroid: ({largestShopCluster.Centroid.X}, {largestShopCluster.Centroid.Y})");
+}
+```
+
+**Tips:**
+- Use `Epsilon` to control how close rooms must be to cluster (smaller = tighter clusters)
+- Use `MinClusterSize` to filter out isolated rooms (noise filtering)
+- Use `MaxClusterSize` to prevent clusters from becoming too large
+- Use `RoomTypesToCluster` to only cluster specific room types (improves performance)
+- Clustering is deterministic - same seed produces identical clusters
+- Clustering runs once per floor generation (performance is acceptable for 100+ rooms)
+- Cluster results are cached in `FloorLayout` to avoid recomputation
+
+See [Constraints](Constraints#cluster-aware-constraints) for cluster-aware constraints and [Working with Output](Working-with-Output#clusters) for accessing clusters in generated layouts.
+
 ## Complete Example
 
 ```csharp

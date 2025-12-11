@@ -98,5 +98,10 @@ public sealed class FloorConfig<TRoomType> where TRoomType : Enum
     /// Configuration for room difficulty scaling. If null, difficulty is not calculated.
     /// </summary>
     public DifficultyConfig? DifficultyConfig { get; init; }
+
+    /// <summary>
+    /// Configuration for room clustering detection. If null, clustering is disabled.
+    /// </summary>
+    public ClusterConfig<TRoomType>? ClusterConfig { get; set; }
 }
 
