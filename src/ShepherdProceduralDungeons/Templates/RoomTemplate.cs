@@ -39,6 +39,16 @@ public sealed class RoomTemplate<TRoomType> where TRoomType : Enum
     public IReadOnlyDictionary<Cell, InteriorFeature> InteriorFeatures { get; init; } = new Dictionary<Cell, InteriorFeature>();
 
     /// <summary>
+    /// Minimum difficulty level this template can be used for. Null means no minimum.
+    /// </summary>
+    public double? MinDifficulty { get; init; }
+
+    /// <summary>
+    /// Maximum difficulty level this template can be used for. Null means no maximum.
+    /// </summary>
+    public double? MaxDifficulty { get; init; }
+
+    /// <summary>
     /// Gets the bounding box width of this template.
     /// </summary>
     public int Width => Cells.Count > 0 ? Cells.Max(c => c.X) - Cells.Min(c => c.X) + 1 : 0;

@@ -567,6 +567,183 @@ var config = new FloorConfig<RoomType>
 
 See [Working with Output](Working-with-Output#secret-passages) for how to access secret passages in generated layouts.
 
+### DifficultyConfig
+
+```csharp
+DifficultyConfig = new DifficultyConfig
+{
+    BaseDifficulty = 1.0,
+    ScalingFactor = 1.0,
+    Function = DifficultyScalingFunction.Linear,
+    MaxDifficulty = 10.0
+}
+```
+
+**Type:** `DifficultyConfig?`
+
+**Default:** `null` (difficulty not calculated)
+
+**Description:** Configuration for room difficulty scaling based on distance from spawn. Enables progressive difficulty curves where rooms become more challenging as players explore deeper into the dungeon.
+
+**Properties:**
+
+- **BaseDifficulty** (double, default: 1.0) - Base difficulty for the spawn room (distance 0). This is the starting difficulty level.
+- **ScalingFactor** (double, default: 1.0) - Scaling factor used by the scaling function. Controls how quickly difficulty increases with distance.
+- **Function** (DifficultyScalingFunction, default: `Linear`) - The scaling function to use:
+  - `Linear` - Linear scaling: `difficulty = baseDifficulty + (distance * scalingFactor)`
+  - `Exponential` - Exponential scaling: `difficulty = baseDifficulty + (scalingFactor ^ distance)`
+  - `Custom` - Custom function provided via `CustomFunction` property
+- **CustomFunction** (Func<int, double>?, default: null) - Custom function for difficulty calculation. Only used when `Function` is `Custom`. Takes distance as input and returns difficulty.
+- **MaxDifficulty** (double, default: 10.0) - Maximum difficulty cap. All calculated difficulties will be clamped to this value.
+
+**How Difficulty Scaling Works:**
+
+Difficulty is calculated automatically for each room based on its distance from the spawn room:
+- **Spawn room** (distance 0) always has `BaseDifficulty`
+- **Other rooms** have difficulty calculated using the selected scaling function
+- **All difficulties** are clamped to `MaxDifficulty` to prevent unbounded scaling
+- **Deterministic** - Same seed and config produce identical difficulty assignments
+
+**Scaling Functions:**
+
+1. **Linear Scaling** (default):
+   ```
+   difficulty = BaseDifficulty + (distance * ScalingFactor)
+   ```
+   Example: `BaseDifficulty = 1.0`, `ScalingFactor = 1.5`
+   - Distance 0: 1.0
+   - Distance 1: 2.5
+   - Distance 2: 4.0
+   - Distance 3: 5.5
+
+2. **Exponential Scaling**:
+   ```
+   difficulty = BaseDifficulty + (ScalingFactor ^ distance)
+   ```
+   Example: `BaseDifficulty = 1.0`, `ScalingFactor = 2.0`
+   - Distance 0: 1.0
+   - Distance 1: 3.0 (1.0 + 2^1)
+   - Distance 2: 5.0 (1.0 + 2^2)
+   - Distance 3: 9.0 (1.0 + 2^3)
+
+3. **Custom Function**:
+   ```csharp
+   DifficultyConfig = new DifficultyConfig
+   {
+       Function = DifficultyScalingFunction.Custom,
+       CustomFunction = distance => 1.0 + (distance * distance * 0.5)  // Quadratic scaling
+   }
+   ```
+
+**Example - Linear Scaling:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        ScalingFactor = 1.5,
+        Function = DifficultyScalingFunction.Linear,
+        MaxDifficulty = 10.0
+    }
+};
+```
+
+**Example - Exponential Scaling:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        ScalingFactor = 1.8,
+        Function = DifficultyScalingFunction.Exponential,
+        MaxDifficulty = 15.0
+    }
+};
+```
+
+**Example - Custom Function:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        Function = DifficultyScalingFunction.Custom,
+        CustomFunction = distance =>
+        {
+            // Slow start, rapid increase after distance 3
+            if (distance <= 3)
+                return 1.0 + (distance * 0.5);
+            else
+                return 2.5 + ((distance - 3) * 2.0);
+        },
+        MaxDifficulty = 20.0
+    }
+};
+```
+
+**Using Difficulty in Constraints:**
+
+Difficulty can be used with constraints to control room placement:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        ScalingFactor = 1.5,
+        Function = DifficultyScalingFunction.Linear,
+        MaxDifficulty = 10.0
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        // Boss only in high-difficulty areas
+        new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0),
+        
+        // Easy combat rooms only in low-difficulty areas
+        new MaxDifficultyConstraint<RoomType>(RoomType.EasyCombat, 3.0),
+        
+        // Elite rooms in medium-difficulty areas
+        new MinDifficultyConstraint<RoomType>(RoomType.Elite, 4.0),
+        new MaxDifficultyConstraint<RoomType>(RoomType.Elite, 8.0)
+    }
+};
+```
+
+**Accessing Difficulty in Output:**
+
+After generation, difficulty is available in `PlacedRoom`:
+
+```csharp
+var layout = generator.Generate(config);
+
+foreach (var room in layout.Rooms)
+{
+    Console.WriteLine($"Room {room.NodeId} ({room.RoomType}): Difficulty {room.Difficulty:F2}");
+}
+```
+
+**Tips:**
+- Use linear scaling for predictable, steady difficulty increases
+- Use exponential scaling for dramatic difficulty spikes in deeper areas
+- Use custom functions for complex curves (e.g., slow start, rapid middle, plateau at end)
+- Set `MaxDifficulty` to cap difficulty for balance
+- Combine difficulty constraints with distance constraints for fine-grained control
+- Difficulty is calculated deterministically - same seed produces same difficulties
+- Difficulty is available even if not used in constraints (useful for game systems)
+
+See [Constraints](Constraints#difficulty-constraints) for details on difficulty-aware constraints.
+
 ## Complete Example
 
 ```csharp

@@ -30,6 +30,11 @@ public sealed class PlacedRoom<TRoomType> where TRoomType : Enum
     public required Cell Position { get; init; }
 
     /// <summary>
+    /// Difficulty level of this room, calculated based on distance from spawn.
+    /// </summary>
+    public required double Difficulty { get; init; }
+
+    /// <summary>
     /// Gets all cells this room occupies in world coordinates.
     /// </summary>
     public IEnumerable<Cell> GetWorldCells() =>

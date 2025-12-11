@@ -188,7 +188,8 @@ public class RoomInteriorFeaturesTests
             NodeId = 1,
             RoomType = TestHelpers.RoomType.Combat,
             Template = template,
-            Position = new Cell(10, 20) // Room placed at offset (10, 20)
+            Position = new Cell(10, 20), // Room placed at offset (10, 20)
+            Difficulty = 1.0
         };
 
         // Act
@@ -224,7 +225,8 @@ public class RoomInteriorFeaturesTests
             NodeId = 1,
             RoomType = TestHelpers.RoomType.Combat,
             Template = template,
-            Position = new Cell(0, 0)
+            Position = new Cell(0, 0),
+            Difficulty = 1.0
         };
 
         // Act
@@ -260,7 +262,8 @@ public class RoomInteriorFeaturesTests
             NodeId = 1,
             RoomType = TestHelpers.RoomType.Combat,
             Template = template1,
-            Position = new Cell(0, 0)
+            Position = new Cell(0, 0),
+            Difficulty = 1.0
         };
 
         var placedRoom2 = new PlacedRoom<TestHelpers.RoomType>
@@ -268,7 +271,8 @@ public class RoomInteriorFeaturesTests
             NodeId = 2,
             RoomType = TestHelpers.RoomType.Combat,
             Template = template2,
-            Position = new Cell(10, 10)
+            Position = new Cell(10, 10),
+            Difficulty = 1.0
         };
 
         var layout = new FloorLayout<TestHelpers.RoomType>
@@ -313,7 +317,8 @@ public class RoomInteriorFeaturesTests
             NodeId = 1,
             RoomType = TestHelpers.RoomType.Combat,
             Template = template,
-            Position = new Cell(0, 0)
+            Position = new Cell(0, 0),
+            Difficulty = 1.0
         };
 
         var layout = new FloorLayout<TestHelpers.RoomType>

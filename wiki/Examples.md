@@ -800,6 +800,219 @@ This example demonstrates:
 - **Key item before Boss**: Key item acts as a progression gate that must be encountered before the boss
 - **Critical path ordering**: Ensures players encounter content in the intended sequence
 
+## Difficulty Scaling
+
+Example using room difficulty scaling to create progressive difficulty curves:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, EasyCombat, Elite, Shop, Treasure
+}
+
+// Templates
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Spawn
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Boss
+    RoomTemplateBuilder<RoomType>.Rectangle(8, 8)
+        .WithId("boss-arena")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    // Combat (default)
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Easy Combat
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("easy-combat")
+        .ForRoomTypes(RoomType.EasyCombat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Elite
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("elite")
+        .ForRoomTypes(RoomType.Elite)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Shop
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    // Treasure
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+// Constraints with difficulty requirements
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss: high difficulty AND far from start
+    new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0),
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Easy Combat: low difficulty only
+    new MaxDifficultyConstraint<RoomType>(RoomType.EasyCombat, 2.5),
+    new MaxPerFloorConstraint<RoomType>(RoomType.EasyCombat, 3),
+    
+    // Elite: medium-high difficulty range
+    new MinDifficultyConstraint<RoomType>(RoomType.Elite, 5.0),
+    new MaxDifficultyConstraint<RoomType>(RoomType.Elite, 8.0),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Elite),
+    
+    // Shop: accessible early (low difficulty)
+    new MaxDifficultyConstraint<RoomType>(RoomType.Shop, 3.0),
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    
+    // Treasure: medium difficulty
+    new MinDifficultyConstraint<RoomType>(RoomType.Treasure, 3.0),
+    new MaxDifficultyConstraint<RoomType>(RoomType.Treasure, 6.0),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
+};
+
+// Config with difficulty scaling
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 20,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.EasyCombat, 3),
+        (RoomType.Elite, 2),
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 2)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f,
+    
+    // Difficulty scaling configuration
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        ScalingFactor = 1.5,
+        Function = DifficultyScalingFunction.Linear,
+        MaxDifficulty = 10.0
+    }
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Display difficulty information
+Console.WriteLine("Room Difficulties:");
+foreach (var room in layout.Rooms.OrderBy(r => r.Difficulty))
+{
+    Console.WriteLine($"  Node {room.NodeId,2}: {room.RoomType,-12} Difficulty: {room.Difficulty:F2}");
+}
+
+// Verify difficulty constraints
+Console.WriteLine("\nDifficulty Constraint Verification:");
+var bossRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Boss);
+foreach (var boss in bossRooms)
+{
+    Console.WriteLine($"  Boss at node {boss.NodeId}: Difficulty {boss.Difficulty:F2} (>= 7.0: {boss.Difficulty >= 7.0})");
+}
+
+var easyCombatRooms = layout.Rooms.Where(r => r.RoomType == RoomType.EasyCombat);
+foreach (var easy in easyCombatRooms)
+{
+    Console.WriteLine($"  EasyCombat at node {easy.NodeId}: Difficulty {easy.Difficulty:F2} (<= 2.5: {easy.Difficulty <= 2.5})");
+}
+```
+
+**Example Output:**
+```
+Room Difficulties:
+  Node  0: Spawn        Difficulty: 1.00
+  Node  3: EasyCombat   Difficulty: 1.75
+  Node  5: EasyCombat   Difficulty: 2.25
+  Node  7: Shop         Difficulty: 2.50
+  Node  9: Combat       Difficulty: 3.00
+  Node 12: Treasure     Difficulty: 4.00
+  Node 15: Elite        Difficulty: 5.50
+  Node 18: Elite        Difficulty: 6.75
+  Node 19: Boss         Difficulty: 7.50
+
+Difficulty Constraint Verification:
+  Boss at node 19: Difficulty 7.50 (>= 7.0: True)
+  EasyCombat at node 3: Difficulty 1.75 (<= 2.5: True)
+  EasyCombat at node 5: Difficulty 2.25 (<= 2.5: True)
+```
+
+**Example - Exponential Scaling:**
+
+For more dramatic difficulty increases:
+
+```csharp
+DifficultyConfig = new DifficultyConfig
+{
+    BaseDifficulty = 1.0,
+    ScalingFactor = 1.8,
+    Function = DifficultyScalingFunction.Exponential,
+    MaxDifficulty = 15.0
+}
+```
+
+**Example - Custom Function:**
+
+For custom difficulty curves:
+
+```csharp
+DifficultyConfig = new DifficultyConfig
+{
+    BaseDifficulty = 1.0,
+    Function = DifficultyScalingFunction.Custom,
+    CustomFunction = distance =>
+    {
+        // Slow start (distance 0-2), rapid increase (distance 3-5), plateau (distance 6+)
+        if (distance <= 2)
+            return 1.0 + (distance * 0.5);
+        else if (distance <= 5)
+            return 2.0 + ((distance - 2) * 2.0);
+        else
+            return 8.0;  // Plateau at difficulty 8.0
+    },
+    MaxDifficulty = 10.0
+}
+```
+
+This example demonstrates:
+- **Progressive difficulty**: Rooms become more challenging as distance increases
+- **Difficulty-based constraints**: Room types placed based on difficulty ranges
+- **Linear scaling**: Steady difficulty increase (can use exponential or custom)
+- **Difficulty metadata**: Access difficulty values in generated layouts
+
 ## Linear Dungeon
 
 Minimal branching for a linear progression:

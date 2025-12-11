@@ -500,6 +500,129 @@ new MaxDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Shop, 1)
 - Works correctly with partially assigned graphs (only checks already-assigned reference rooms)
 - If target and reference are the same type, allows clustering within the specified distance
 
+### MinDifficultyConstraint
+
+Requires a room to have at least a minimum difficulty level. This constraint requires `DifficultyConfig` to be set in `FloorConfig`.
+
+```csharp
+new MinDifficultyConstraint<RoomType>(
+    RoomType.Boss, 
+    minDifficulty: 7.0
+)
+```
+
+**Use case:** Ensure room types appear only in high-difficulty areas. Common scenarios include:
+- Boss rooms only in challenging areas
+- Elite enemies only in difficult zones
+- High-value rewards only in dangerous areas
+
+**Important:** This constraint requires `DifficultyConfig` to be configured in `FloorConfig`. Difficulty is calculated automatically based on distance from spawn.
+
+**Example:**
+```csharp
+// Boss only in high-difficulty areas (difficulty >= 7.0)
+new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0)
+
+// Elite enemies only in medium-to-high difficulty (difficulty >= 5.0)
+new MinDifficultyConstraint<RoomType>(RoomType.Elite, 5.0)
+
+// High-value treasure only in dangerous areas (difficulty >= 6.0)
+new MinDifficultyConstraint<RoomType>(RoomType.RareTreasure, 6.0)
+```
+
+**Behavior:**
+- Checks `node.Difficulty >= MinDifficulty`
+- Returns `true` if room difficulty meets or exceeds minimum requirement
+- Returns `false` if room difficulty is below minimum
+- Difficulty is calculated automatically during graph generation based on distance from spawn
+
+**Combining with Other Constraints:**
+
+Difficulty constraints work seamlessly with other constraints:
+
+```csharp
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss: high difficulty AND far from start AND dead end
+    new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0),
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Elite: medium-high difficulty AND not on critical path
+    new MinDifficultyConstraint<RoomType>(RoomType.Elite, 5.0),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Elite)
+};
+```
+
+### MaxDifficultyConstraint
+
+Requires a room to have at most a maximum difficulty level. This constraint requires `DifficultyConfig` to be set in `FloorConfig`.
+
+```csharp
+new MaxDifficultyConstraint<RoomType>(
+    RoomType.Tutorial, 
+    maxDifficulty: 2.0
+)
+```
+
+**Use case:** Ensure room types appear only in low-difficulty areas. Common scenarios include:
+- Tutorial rooms only in easy areas
+- Shops accessible early (low difficulty)
+- Easy combat rooms only in starting areas
+- Safe rooms (rest areas) only in low-difficulty zones
+
+**Important:** This constraint requires `DifficultyConfig` to be configured in `FloorConfig`. Difficulty is calculated automatically based on distance from spawn.
+
+**Example:**
+```csharp
+// Tutorial rooms only in easy areas (difficulty <= 2.0)
+new MaxDifficultyConstraint<RoomType>(RoomType.Tutorial, 2.0)
+
+// Shops accessible early (difficulty <= 3.0)
+new MaxDifficultyConstraint<RoomType>(RoomType.Shop, 3.0)
+
+// Easy combat only in starting areas (difficulty <= 2.5)
+new MaxDifficultyConstraint<RoomType>(RoomType.EasyCombat, 2.5)
+```
+
+**Behavior:**
+- Checks `node.Difficulty <= MaxDifficulty`
+- Returns `true` if room difficulty is at or below maximum requirement
+- Returns `false` if room difficulty exceeds maximum
+- Difficulty is calculated automatically during graph generation based on distance from spawn
+
+**Combining Min and Max:**
+
+You can combine both constraints to create difficulty range requirements:
+
+```csharp
+// Medium-difficulty rooms (between 3.0 and 7.0)
+new MinDifficultyConstraint<RoomType>(RoomType.MediumCombat, 3.0),
+new MaxDifficultyConstraint<RoomType>(RoomType.MediumCombat, 7.0)
+
+// Elite rooms in high-difficulty range (between 6.0 and 9.0)
+new MinDifficultyConstraint<RoomType>(RoomType.Elite, 6.0),
+new MaxDifficultyConstraint<RoomType>(RoomType.Elite, 9.0)
+```
+
+**Combining with Other Constraints:**
+
+Difficulty constraints work seamlessly with other constraints:
+
+```csharp
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Shop: low difficulty AND accessible early AND not on critical path
+    new MaxDifficultyConstraint<RoomType>(RoomType.Shop, 3.0),
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
+    
+    // Easy combat: low difficulty AND limited count
+    new MaxDifficultyConstraint<RoomType>(RoomType.EasyCombat, 2.5),
+    new MaxPerFloorConstraint<RoomType>(RoomType.EasyCombat, 3)
+};
+```
+
 ### MustComeBeforeConstraint
 
 Ensures a room type must appear before another room type (or types) on the critical path (the shortest path from spawn to boss).

@@ -388,6 +388,92 @@ Secret passages are configured via `SecretPassageConfig`:
 
 See [Configuration](Configuration#secretpassageconfig) for details.
 
+## Room Difficulty Scaling
+
+### What It Is
+
+Room difficulty scaling automatically assigns difficulty levels to rooms based on their distance from the spawn room. This enables progressive difficulty curves where rooms become more challenging as players explore deeper into the dungeon.
+
+### How Difficulty Works
+
+Difficulty is calculated automatically during graph generation:
+- **Spawn room** (distance 0) always has the base difficulty
+- **Other rooms** have difficulty calculated using a scaling function (linear, exponential, or custom)
+- **All difficulties** are clamped to a maximum value
+- **Deterministic** - Same seed and config produce identical difficulty assignments
+
+### Scaling Functions
+
+The system supports three scaling functions:
+
+1. **Linear Scaling**: Difficulty increases steadily with distance
+   ```
+   difficulty = BaseDifficulty + (distance * ScalingFactor)
+   ```
+
+2. **Exponential Scaling**: Difficulty increases dramatically with distance
+   ```
+   difficulty = BaseDifficulty + (ScalingFactor ^ distance)
+   ```
+
+3. **Custom Function**: User-provided function for any curve shape
+
+### Using Difficulty
+
+Difficulty can be used in several ways:
+
+1. **Constraints**: Control room placement based on difficulty
+   ```csharp
+   // Boss only in high-difficulty areas
+   new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0)
+   
+   // Easy combat only in low-difficulty areas
+   new MaxDifficultyConstraint<RoomType>(RoomType.EasyCombat, 2.5)
+   ```
+
+2. **Output Metadata**: Access difficulty in generated layouts
+   ```csharp
+   foreach (var room in layout.Rooms)
+   {
+       Console.WriteLine($"Room {room.NodeId}: Difficulty {room.Difficulty}");
+   }
+   ```
+
+3. **Game Systems**: Use difficulty for enemy scaling, rewards, or other gameplay mechanics
+
+### Configuration
+
+Difficulty is configured via `DifficultyConfig` in `FloorConfig`:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    DifficultyConfig = new DifficultyConfig
+    {
+        BaseDifficulty = 1.0,
+        ScalingFactor = 1.5,
+        Function = DifficultyScalingFunction.Linear,
+        MaxDifficulty = 10.0
+    }
+};
+```
+
+If `DifficultyConfig` is `null`, difficulty is not calculated and difficulty constraints cannot be used.
+
+### Integration with Constraints
+
+Difficulty constraints work seamlessly with other constraints:
+
+```csharp
+// Boss: high difficulty AND far from start AND dead end
+new MinDifficultyConstraint<RoomType>(RoomType.Boss, 7.0),
+new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
+```
+
+See [Configuration](Configuration#difficultyconfig) and [Constraints](Constraints#difficulty-constraints) for details.
+
 ## Generation Pipeline
 
 ```

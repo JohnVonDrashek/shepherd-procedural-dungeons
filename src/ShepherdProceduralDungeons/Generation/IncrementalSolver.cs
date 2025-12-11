@@ -6,14 +6,15 @@ using ShepherdProceduralDungeons.Templates;
 
 namespace ShepherdProceduralDungeons.Generation;
 
-/// <summary>
-/// Default spatial solver that places rooms incrementally via BFS from the start room.
-/// </summary>
-/// <typeparam name="TRoomType">The enum type representing different room types.</typeparam>
+    /// <summary>
+    /// Default spatial solver that places rooms incrementally via BFS from the start room.
+    /// </summary>
+    /// <typeparam name="TRoomType">The enum type representing different room types.</typeparam>
 public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> where TRoomType : Enum
 {
     private IReadOnlyDictionary<int, string>? _zoneAssignments;
     private IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? _zoneTemplates;
+    private FloorGraph? _graph;
 
     /// <summary>
     /// Sets zone information for zone-aware template selection.
@@ -34,6 +35,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         HallwayMode hallwayMode,
         Random rng)
     {
+        _graph = graph;
         var placedRooms = new Dictionary<int, PlacedRoom<TRoomType>>();
         var occupiedCells = new HashSet<Cell>();
 
@@ -43,7 +45,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         // 1. Place start room at origin
         var startNode = graph.Nodes.First(n => n.Id == graph.StartNodeId);
         var startTemplate = SelectTemplateWithZone(assignments[startNode.Id], templates, rng, startNode.Id);
-        var startRoom = PlaceRoom(startNode.Id, startTemplate, new Cell(0, 0), assignments[startNode.Id]);
+        var startRoom = PlaceRoom(startNode.Id, startTemplate, new Cell(0, 0), assignments[startNode.Id], startNode.Difficulty);
         placedRooms[startNode.Id] = startRoom;
         AddOccupiedCells(startRoom, occupiedCells);
         
@@ -80,7 +82,8 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
 
                 if (placement.HasValue)
                 {
-                    var neighborRoom = PlaceRoom(neighborId, neighborTemplate, placement.Value, assignments[neighborId]);
+                    var neighborNode = graph.Nodes.First(n => n.Id == neighborId);
+                    var neighborRoom = PlaceRoom(neighborId, neighborTemplate, placement.Value, assignments[neighborId], neighborNode.Difficulty);
                     placedRooms[neighborId] = neighborRoom;
                     AddOccupiedCells(neighborRoom, occupiedCells);
                     
@@ -97,7 +100,8 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 {
                     // Place nearby with gap for hallway
                     var nearbyPlacement = PlaceNearby(currentRoom, neighborTemplate, occupiedCells, rng);
-                    var neighborRoom = PlaceRoom(neighborId, neighborTemplate, nearbyPlacement, assignments[neighborId]);
+                    var neighborNode = graph.Nodes.First(n => n.Id == neighborId);
+                    var neighborRoom = PlaceRoom(neighborId, neighborTemplate, nearbyPlacement, assignments[neighborId], neighborNode.Difficulty);
                     placedRooms[neighborId] = neighborRoom;
                     AddOccupiedCells(neighborRoom, occupiedCells);
 
@@ -270,6 +274,17 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         IReadOnlyDictionary<int, string>? zoneAssignments,
         IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? zoneTemplates)
     {
+        // Get node difficulty if available
+        double? nodeDifficulty = null;
+        if (nodeId.HasValue && _graph != null)
+        {
+            var node = _graph.Nodes.FirstOrDefault(n => n.Id == nodeId.Value);
+            if (node != null)
+            {
+                nodeDifficulty = node.Difficulty;
+            }
+        }
+
         // Try zone-specific templates first if available
         List<RoomTemplate<TRoomType>>? zoneSpecificTemplates = null;
         if (nodeId.HasValue && zoneAssignments != null && zoneTemplates != null)
@@ -279,6 +294,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
             {
                 zoneSpecificTemplates = zoneTemplatesList
                     .Where(t => t.ValidRoomTypes.Contains(roomType))
+                    .Where(t => MatchesDifficultyBounds(t, nodeDifficulty))
                     .ToList();
             }
         }
@@ -291,10 +307,10 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
             var allTemplates = new List<RoomTemplate<TRoomType>>(zoneSpecificTemplates);
             if (templates.TryGetValue(roomType, out var globalTemplates))
             {
-                // Add global templates that aren't already in zone templates
+                // Add global templates that aren't already in zone templates and match difficulty
                 foreach (var global in globalTemplates)
                 {
-                    if (!allTemplates.Any(t => t.Id == global.Id))
+                    if (!allTemplates.Any(t => t.Id == global.Id) && MatchesDifficultyBounds(global, nodeDifficulty))
                     {
                         allTemplates.Add(global);
                     }
@@ -307,11 +323,11 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
             // Use global templates
             if (!templates.TryGetValue(roomType, out var global) || global.Count == 0)
                 throw new InvalidConfigurationException($"No templates registered for room type {roomType}");
-            available = global;
+            available = global.Where(t => MatchesDifficultyBounds(t, nodeDifficulty)).ToList();
         }
 
         if (available.Count == 0)
-            throw new InvalidConfigurationException($"No templates registered for room type {roomType}");
+            throw new InvalidConfigurationException($"No templates registered for room type {roomType} matching difficulty bounds");
 
         // Calculate total weight
         double totalWeight = available.Sum(t => t.Weight);
@@ -342,14 +358,29 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         return SelectTemplate(roomType, templates, rng, nodeId, _zoneAssignments, _zoneTemplates);
     }
 
-    private PlacedRoom<TRoomType> PlaceRoom(int nodeId, RoomTemplate<TRoomType> template, Cell position, TRoomType roomType)
+    private bool MatchesDifficultyBounds(RoomTemplate<TRoomType> template, double? difficulty)
+    {
+        if (difficulty == null)
+            return true; // If no difficulty is set, don't filter
+
+        if (template.MinDifficulty.HasValue && difficulty < template.MinDifficulty.Value)
+            return false;
+
+        if (template.MaxDifficulty.HasValue && difficulty > template.MaxDifficulty.Value)
+            return false;
+
+        return true;
+    }
+
+    private PlacedRoom<TRoomType> PlaceRoom(int nodeId, RoomTemplate<TRoomType> template, Cell position, TRoomType roomType, double difficulty)
     {
         return new PlacedRoom<TRoomType>
         {
             NodeId = nodeId,
             Template = template,
             Position = position,
-            RoomType = roomType
+            RoomType = roomType,
+            Difficulty = difficulty
         };
     }
 

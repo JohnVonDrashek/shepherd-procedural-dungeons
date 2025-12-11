@@ -93,5 +93,10 @@ public sealed class FloorConfig<TRoomType> where TRoomType : Enum
     /// Configuration for hub-and-spoke graph generation. Required when GraphAlgorithm is HubAndSpoke.
     /// </summary>
     public HubAndSpokeGraphConfig? HubAndSpokeConfig { get; init; }
+
+    /// <summary>
+    /// Configuration for room difficulty scaling. If null, difficulty is not calculated.
+    /// </summary>
+    public DifficultyConfig? DifficultyConfig { get; init; }
 }
 

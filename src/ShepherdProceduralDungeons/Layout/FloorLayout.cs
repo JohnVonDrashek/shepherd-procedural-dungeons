@@ -105,5 +105,13 @@ public sealed class FloorLayout<TRoomType> where TRoomType : Enum
     /// </summary>
     public IEnumerable<(Cell WorldCell, InteriorFeature Feature)> InteriorFeatures =>
         Rooms.SelectMany(r => r.GetInteriorFeatures());
+
+    /// <summary>
+    /// Gets a dictionary mapping node IDs to their difficulty levels.
+    /// </summary>
+    public IReadOnlyDictionary<int, double> GetDifficultyByNodeId()
+    {
+        return Rooms.ToDictionary(r => r.NodeId, r => r.Difficulty);
+    }
 }
 

@@ -26,6 +26,11 @@ public sealed class RoomNode
     public int ConnectionCount => Connections.Count;
 
     /// <summary>
+    /// Difficulty level of this room, calculated based on distance from spawn.
+    /// </summary>
+    public double Difficulty { get; internal set; }
+
+    /// <summary>
     /// All connections this node participates in.
     /// </summary>
     internal List<RoomConnection> Connections { get; } = new();

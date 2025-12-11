@@ -14,6 +14,8 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     private Dictionary<Cell, Edge> _doorEdges = new();
     private double _weight = 1.0;
     private Dictionary<Cell, InteriorFeature> _interiorFeatures = new();
+    private double? _minDifficulty;
+    private double? _maxDifficulty;
 
     /// <summary>
     /// Sets the template ID.
@@ -213,6 +215,19 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     }
 
     /// <summary>
+    /// Sets difficulty bounds for this template. Templates will only be selected for rooms within these bounds.
+    /// </summary>
+    /// <param name="minDifficulty">Minimum difficulty (inclusive). Null means no minimum.</param>
+    /// <param name="maxDifficulty">Maximum difficulty (inclusive). Null means no maximum.</param>
+    /// <returns>This builder for method chaining.</returns>
+    public RoomTemplateBuilder<TRoomType> WithDifficultyBounds(double? minDifficulty, double? maxDifficulty)
+    {
+        _minDifficulty = minDifficulty;
+        _maxDifficulty = maxDifficulty;
+        return this;
+    }
+
+    /// <summary>
     /// Allows doors only on specific sides of the bounding box.
     /// </summary>
     /// <param name="sides">Which sides (North, South, East, West) to allow doors on.</param>
@@ -321,7 +336,9 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
             Cells = _cells,
             DoorEdges = _doorEdges,
             Weight = _weight,
-            InteriorFeatures = _interiorFeatures
+            InteriorFeatures = _interiorFeatures,
+            MinDifficulty = _minDifficulty,
+            MaxDifficulty = _maxDifficulty
         };
     }
 }

@@ -100,7 +100,21 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             graph = graphGenerator.Generate(config.RoomCount, config.BranchingFactor, graphRng);
         }
 
-        // 2. Prepare zone data structures (but don't assign zones yet - need critical path first)
+        // 2. Calculate difficulty for all nodes if difficulty config is provided
+        if (config.DifficultyConfig != null)
+        {
+            CalculateDifficulties(graph, config.DifficultyConfig);
+        }
+        else
+        {
+            // Set default difficulty to 0 if no config provided
+            foreach (var node in graph.Nodes)
+            {
+                node.Difficulty = 0.0;
+            }
+        }
+
+        // 3. Prepare zone data structures (but don't assign zones yet - need critical path first)
         Dictionary<int, string>? zoneAssignments = null;
         Dictionary<string, IReadOnlyList<(TRoomType type, int count)>>? zoneRoomRequirements = null;
         Dictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? zoneTemplates = null;
@@ -136,7 +150,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             }
         }
 
-        // 3. Assign room types (pass floor index and zone info for zone-aware constraints)
+        // 4. Assign room types (pass floor index and zone info for zone-aware constraints)
         var typeAssigner = new RoomTypeAssigner<TRoomType>();
         typeAssigner.AssignTypes(
             graph,
@@ -151,14 +165,14 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             zoneAssignments,
             zoneRoomRequirements);
 
-        // 4. Assign all zones now that critical path is available (in config order, first match wins)
+        // 5. Assign all zones now that critical path is available (in config order, first match wins)
         if (config.Zones != null && config.Zones.Count > 0)
         {
             var zoneAssigner = new ZoneAssigner<TRoomType>();
             zoneAssignments = zoneAssigner.AssignZones(graph, config.Zones);
         }
 
-        // 5. Organize templates by room type
+        // 6. Organize templates by room type
         var templatesByType = new Dictionary<TRoomType, List<RoomTemplate<TRoomType>>>();
         foreach (var template in config.Templates)
         {
@@ -180,7 +194,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             kvp => kvp.Key,
             kvp => (IReadOnlyList<RoomTemplate<TRoomType>>)kvp.Value);
 
-        // 6. Spatial placement (with zone-aware template selection)
+        // 7. Spatial placement (with zone-aware template selection and difficulty-aware template selection)
         var spatialSolver = _spatialSolver ?? new IncrementalSolver<TRoomType>();
         if (spatialSolver is IncrementalSolver<TRoomType> incrementalSolver)
         {
@@ -188,15 +202,15 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         }
         var placedRooms = spatialSolver.Solve(graph, assignments, templatesByTypeReadOnly, config.HallwayMode, spatialRng);
 
-        // 7. Generate hallways
+        // 8. Generate hallways
         var occupiedCells = new HashSet<Cell>(placedRooms.SelectMany(r => r.GetWorldCells()));
         var hallwayGenerator = new HallwayGenerator<TRoomType>();
         var hallways = hallwayGenerator.Generate(placedRooms, graph, occupiedCells, hallwayRng);
 
-        // 8. Place doors
+        // 9. Place doors
         var doors = PlaceDoors(placedRooms, hallways, graph);
 
-        // 8.5. Generate secret passages (after hallways, before final output)
+        // 9.5. Generate secret passages (after hallways, before final output)
         int secretPassageSeed = masterRng.Next();
         var secretPassageRng = new Random(secretPassageSeed);
         var secretPassages = GenerateSecretPassages(
@@ -206,7 +220,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             occupiedCells,
             secretPassageRng);
 
-        // 9. Identify transition rooms (rooms connecting different zones)
+        // 10. Identify transition rooms (rooms connecting different zones)
         var transitionRooms = new List<PlacedRoom<TRoomType>>();
         if (zoneAssignments != null && zoneAssignments.Count > 0)
         {
@@ -230,7 +244,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             }
         }
 
-        // 10. Build output
+        // 11. Build output
         return new FloorLayout<TRoomType>
         {
             Rooms = placedRooms,
@@ -244,6 +258,30 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             TransitionRooms = transitionRooms,
             SecretPassages = secretPassages
         };
+    }
+
+    private void CalculateDifficulties(FloorGraph graph, DifficultyConfig difficultyConfig)
+    {
+        foreach (var node in graph.Nodes)
+        {
+            double difficulty = CalculateDifficulty(node.DistanceFromStart, difficultyConfig);
+            node.Difficulty = Math.Min(difficulty, difficultyConfig.MaxDifficulty);
+        }
+    }
+
+    private double CalculateDifficulty(int distance, DifficultyConfig config)
+    {
+        double difficulty = config.Function switch
+        {
+            DifficultyScalingFunction.Linear => config.BaseDifficulty + (distance * config.ScalingFactor),
+            DifficultyScalingFunction.Exponential => distance == 0 
+                ? config.BaseDifficulty 
+                : config.BaseDifficulty + (Math.Pow(config.ScalingFactor, distance) - 1.0),
+            DifficultyScalingFunction.Custom => config.CustomFunction?.Invoke(distance) ?? config.BaseDifficulty,
+            _ => config.BaseDifficulty
+        };
+
+        return Math.Min(difficulty, config.MaxDifficulty);
     }
 
     private IGraphGenerator CreateGraphGenerator(FloorConfig<TRoomType> config)
