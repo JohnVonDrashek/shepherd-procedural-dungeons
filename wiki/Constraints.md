@@ -167,6 +167,66 @@ new MustBeAdjacentToConstraint<RoomType>(RoomType.Rest, RoomType.Combat)
 - Returns `false` if the node has no connections
 - If target room type is in the required adjacent types list, nodes adjacent to already-placed target rooms will be valid
 
+### MustNotBeAdjacentToConstraint
+
+Room must NOT be adjacent to any of the specified room types in the graph topology.
+
+```csharp
+new MustNotBeAdjacentToConstraint<RoomType>(
+    RoomType.Treasure, 
+    RoomType.Spawn
+)
+
+// Multiple forbidden adjacent types
+new MustNotBeAdjacentToConstraint<RoomType>(
+    RoomType.Shop,
+    RoomType.Shop,
+    RoomType.Treasure
+)
+
+// Using IEnumerable
+new MustNotBeAdjacentToConstraint<RoomType>(
+    RoomType.Boss,
+    forbiddenTypes
+)
+```
+
+**Use case:** Prevent specific room types from being placed next to each other. Common scenarios include:
+- Preventing two shops from being adjacent
+- Ensuring treasure rooms don't appear next to spawn rooms
+- Keeping boss rooms isolated from certain room types
+- Creating separation between conflicting room types
+
+**Important:** This constraint operates on the **graph structure** (which rooms connect to which), not the spatial layout. It ensures that when room types are assigned, the target room type is only placed on nodes that have no neighbors with any of the forbidden adjacent room types.
+
+**Example:**
+```csharp
+// Treasure must NOT be adjacent to Spawn room
+new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Treasure, RoomType.Spawn)
+
+// Shop must NOT be adjacent to Shop OR Treasure (prevent clustering)
+new MustNotBeAdjacentToConstraint<RoomType>(
+    RoomType.Shop, 
+    RoomType.Shop, 
+    RoomType.Treasure
+)
+
+// Boss must NOT be adjacent to Spawn or Rest rooms
+new MustNotBeAdjacentToConstraint<RoomType>(
+    RoomType.Boss,
+    RoomType.Spawn,
+    RoomType.Rest
+)
+```
+
+**Behavior:**
+- Checks all neighbors of the candidate node
+- Returns `false` if any neighbor has been assigned one of the forbidden adjacent room types
+- Returns `true` if no neighbors have forbidden types (or neighbors are unassigned)
+- Works correctly with partially assigned graphs (only checks already-assigned neighbors)
+- Returns `true` if the node has no connections (can't violate adjacency constraint)
+- Unassigned neighbors don't cause violations
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -220,7 +280,8 @@ var constraints = new List<IConstraint<RoomType>>
     new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 3),
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
     new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
-    new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat)
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
+    new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Shop)  // Prevent shop clustering
 };
 ```
 
@@ -262,10 +323,11 @@ Treasure is optional, hidden in dead ends, limited quantity.
 new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 3),
 new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
 new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
-new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat)
+new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
+new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Shop)  // Prevent clustering
 ```
 
-Shop is accessible early, optional, one per floor, adjacent to combat rooms.
+Shop is accessible early, optional, one per floor, adjacent to combat rooms, and not adjacent to other shops.
 
 ### Secret Room Pattern
 

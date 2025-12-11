@@ -271,6 +271,25 @@ public class MustBeAdjacentToConstraint<TRoomType> : IConstraint<TRoomType>
 }
 ```
 
+#### MustNotBeAdjacentToConstraint
+
+```csharp
+public class MustNotBeAdjacentToConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ForbiddenAdjacentTypes { get; }
+    
+    // Single forbidden adjacent type
+    public MustNotBeAdjacentToConstraint(TRoomType targetRoomType, TRoomType forbiddenAdjacentType);
+    
+    // Multiple forbidden adjacent types
+    public MustNotBeAdjacentToConstraint(TRoomType targetRoomType, params TRoomType[] forbiddenAdjacentTypes);
+    
+    // Multiple forbidden adjacent types from collection
+    public MustNotBeAdjacentToConstraint(TRoomType targetRoomType, IEnumerable<TRoomType> forbiddenAdjacentTypes);
+}
+```
+
 #### CustomConstraint
 
 ```csharp

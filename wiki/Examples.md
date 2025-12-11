@@ -233,6 +233,7 @@ var constraints = new List<IConstraint<RoomType>>
     
     // Shop must be adjacent to Combat rooms (shops near danger)
     new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
+    new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Shop),  // Prevent shop clustering
     new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
     new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
     
@@ -242,6 +243,7 @@ var constraints = new List<IConstraint<RoomType>>
         RoomType.Boss, 
         RoomType.Combat
     ),
+    new MustNotBeAdjacentToConstraint<RoomType>(RoomType.Treasure, RoomType.Spawn),  // Keep treasure away from spawn
     new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
     new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2),
     
