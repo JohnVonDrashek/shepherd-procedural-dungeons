@@ -554,6 +554,59 @@ new MustComeBeforeConstraint<RoomType>(RoomType.KeyItem, RoomType.Boss)
 
 **Note:** This constraint is particularly useful for game design patterns where certain encounters must happen in a specific order. Since the critical path represents the main progression route, this ensures players encounter content in the intended sequence.
 
+### OnlyInZoneConstraint
+
+Requires a room type to only be placed in a specific zone. This constraint is zone-aware and requires zones to be configured.
+
+```csharp
+new OnlyInZoneConstraint<RoomType>(
+    RoomType.Shop, 
+    zoneId: "market"
+)
+```
+
+**Use case:** Restrict room types to specific zones. Common scenarios include:
+- Shops only in market zone
+- Boss rooms only in final zone
+- Special rooms restricted to specific thematic areas
+- Create zone-specific room placement rules
+
+**Important:** This constraint implements `IZoneAwareConstraint` and requires zones to be configured in `FloorConfig`. The zone assignments are automatically set during generation.
+
+**Example:**
+```csharp
+// Shop only in market zone
+var marketZone = new Zone<RoomType>
+{
+    Id = "market",
+    Name = "Market",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    }
+};
+
+var constraint = new OnlyInZoneConstraint<RoomType>(RoomType.Shop, "market");
+
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    Zones = new[] { marketZone },
+    Constraints = new List<IConstraint<RoomType>> { constraint },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 2)  // Shops will only be placed in market zone
+    }
+};
+```
+
+**Behavior:**
+- Returns `true` if the node is assigned to the required zone
+- Returns `false` if the node is assigned to a different zone
+- Returns `true` if zones haven't been assigned yet (permissive during early assignment phases)
+- Works correctly with zone assignment system - automatically receives zone assignments during generation
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -915,6 +968,49 @@ var layout = generator.Generate(multiFloorConfig);
 ### Backward Compatibility
 
 Floor-aware constraints work in single-floor dungeons too - they simply allow all placements when the floor index isn't set, ensuring backward compatibility.
+
+## Zone-Aware Constraints
+
+Zone-aware constraints (`IZoneAwareConstraint`) are special constraints that check zone assignments. They're used with zones to control room placement based on which zone a room belongs to.
+
+### Available Zone-Aware Constraints
+
+- `OnlyInZoneConstraint` - Room type must be in a specific zone
+
+### How They Work
+
+When zones are configured in `FloorConfig`, zone-aware constraints are automatically configured with zone assignments during generation:
+
+```csharp
+var marketZone = new Zone<RoomType>
+{
+    Id = "market",
+    Name = "Market",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    }
+};
+
+var config = new FloorConfig<RoomType>
+{
+    // ...
+    Zones = new[] { marketZone },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Shop, "market")
+    }
+};
+
+// FloorGenerator automatically sets zone assignments on zone-aware constraints
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+```
+
+### Backward Compatibility
+
+Zone-aware constraints work without zones too - they simply allow all placements when zones aren't configured, ensuring backward compatibility.
 
 ## Next Steps
 

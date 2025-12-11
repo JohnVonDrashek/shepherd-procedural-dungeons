@@ -12,6 +12,20 @@ namespace ShepherdProceduralDungeons.Generation;
 /// <typeparam name="TRoomType">The enum type representing different room types.</typeparam>
 public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> where TRoomType : Enum
 {
+    private IReadOnlyDictionary<int, string>? _zoneAssignments;
+    private IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? _zoneTemplates;
+
+    /// <summary>
+    /// Sets zone information for zone-aware template selection.
+    /// </summary>
+    internal void SetZoneInfo(
+        IReadOnlyDictionary<int, string>? zoneAssignments,
+        IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? zoneTemplates)
+    {
+        _zoneAssignments = zoneAssignments;
+        _zoneTemplates = zoneTemplates;
+    }
+
     /// <inheritdoc/>
     public IReadOnlyList<PlacedRoom<TRoomType>> Solve(
         FloorGraph graph,
@@ -28,7 +42,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
 
         // 1. Place start room at origin
         var startNode = graph.Nodes.First(n => n.Id == graph.StartNodeId);
-        var startTemplate = SelectTemplate(assignments[startNode.Id], templates, rng);
+        var startTemplate = SelectTemplateWithZone(assignments[startNode.Id], templates, rng, startNode.Id);
         var startRoom = PlaceRoom(startNode.Id, startTemplate, new Cell(0, 0), assignments[startNode.Id]);
         placedRooms[startNode.Id] = startRoom;
         AddOccupiedCells(startRoom, occupiedCells);
@@ -59,7 +73,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 if (visited.Contains(neighborId)) continue;
                 visited.Add(neighborId);
 
-                var neighborTemplate = SelectTemplate(assignments[neighborId], templates, rng);
+                var neighborTemplate = SelectTemplateWithZone(assignments[neighborId], templates, rng, neighborId);
 
                 // Try to place adjacent to current room
                 var placement = TryPlaceAdjacent(currentRoom, neighborTemplate, occupiedCells, rng);
@@ -240,9 +254,63 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         return true;
     }
 
-    private RoomTemplate<TRoomType> SelectTemplate(TRoomType roomType, IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates, Random rng)
+    private RoomTemplate<TRoomType> SelectTemplate(
+        TRoomType roomType, 
+        IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates, 
+        Random rng)
     {
-        if (!templates.TryGetValue(roomType, out var available) || available.Count == 0)
+        return SelectTemplate(roomType, templates, rng, null, _zoneAssignments, _zoneTemplates);
+    }
+
+    private RoomTemplate<TRoomType> SelectTemplate(
+        TRoomType roomType, 
+        IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates, 
+        Random rng,
+        int? nodeId,
+        IReadOnlyDictionary<int, string>? zoneAssignments,
+        IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? zoneTemplates)
+    {
+        // Try zone-specific templates first if available
+        List<RoomTemplate<TRoomType>>? zoneSpecificTemplates = null;
+        if (nodeId.HasValue && zoneAssignments != null && zoneTemplates != null)
+        {
+            if (zoneAssignments.TryGetValue(nodeId.Value, out var zoneId) &&
+                zoneTemplates.TryGetValue(zoneId, out var zoneTemplatesList))
+            {
+                zoneSpecificTemplates = zoneTemplatesList
+                    .Where(t => t.ValidRoomTypes.Contains(roomType))
+                    .ToList();
+            }
+        }
+
+        // Get available templates (zone-specific preferred, fallback to global)
+        IReadOnlyList<RoomTemplate<TRoomType>> available;
+        if (zoneSpecificTemplates != null && zoneSpecificTemplates.Count > 0)
+        {
+            // Prefer zone-specific templates, but include global templates as fallback
+            var allTemplates = new List<RoomTemplate<TRoomType>>(zoneSpecificTemplates);
+            if (templates.TryGetValue(roomType, out var globalTemplates))
+            {
+                // Add global templates that aren't already in zone templates
+                foreach (var global in globalTemplates)
+                {
+                    if (!allTemplates.Any(t => t.Id == global.Id))
+                    {
+                        allTemplates.Add(global);
+                    }
+                }
+            }
+            available = allTemplates;
+        }
+        else
+        {
+            // Use global templates
+            if (!templates.TryGetValue(roomType, out var global) || global.Count == 0)
+                throw new InvalidConfigurationException($"No templates registered for room type {roomType}");
+            available = global;
+        }
+
+        if (available.Count == 0)
             throw new InvalidConfigurationException($"No templates registered for room type {roomType}");
 
         // Calculate total weight
@@ -250,7 +318,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         if (totalWeight <= 0)
             throw new InvalidConfigurationException($"Total weight for room type {roomType} must be positive");
 
-        // Weighted random selection
+        // Weighted random selection (zone templates have higher effective weight)
         double randomValue = rng.NextDouble() * totalWeight;
         double cumulative = 0;
         
@@ -263,6 +331,15 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         
         // Fallback (shouldn't happen, but for safety)
         return available[available.Count - 1];
+    }
+
+    private RoomTemplate<TRoomType> SelectTemplateWithZone(
+        TRoomType roomType,
+        IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates,
+        Random rng,
+        int nodeId)
+    {
+        return SelectTemplate(roomType, templates, rng, nodeId, _zoneAssignments, _zoneTemplates);
     }
 
     private PlacedRoom<TRoomType> PlaceRoom(int nodeId, RoomTemplate<TRoomType> template, Cell position, TRoomType roomType)

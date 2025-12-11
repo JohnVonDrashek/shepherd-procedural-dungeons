@@ -1,3 +1,4 @@
+using ShepherdProceduralDungeons.Configuration;
 using ShepherdProceduralDungeons.Constraints;
 using ShepherdProceduralDungeons.Exceptions;
 using ShepherdProceduralDungeons.Graph;
@@ -22,6 +23,8 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
     /// <param name="rng">Random number generator.</param>
     /// <param name="assignments">Output dictionary mapping node IDs to room types.</param>
     /// <param name="floorIndex">Optional floor index for floor-aware constraints. Use -1 for single-floor generation.</param>
+    /// <param name="zoneAssignments">Optional zone assignments for zone-aware constraints.</param>
+    /// <param name="zoneRoomRequirements">Optional zone-specific room requirements.</param>
     public void AssignTypes(
         FloorGraph graph,
         TRoomType spawnType,
@@ -31,7 +34,9 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
         IReadOnlyList<IConstraint<TRoomType>> constraints,
         Random rng,
         out Dictionary<int, TRoomType> assignments,
-        int floorIndex = -1)
+        int floorIndex = -1,
+        IReadOnlyDictionary<int, string>? zoneAssignments = null,
+        IReadOnlyDictionary<string, IReadOnlyList<(TRoomType type, int count)>>? zoneRoomRequirements = null)
     {
         // Set floor index on floor-aware constraints
         if (floorIndex >= 0)
@@ -41,6 +46,18 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                 if (constraint is IFloorAwareConstraint<TRoomType> floorAware)
                 {
                     floorAware.SetFloorIndex(floorIndex);
+                }
+            }
+        }
+
+        // Set zone assignments on zone-aware constraints
+        if (zoneAssignments != null)
+        {
+            foreach (var constraint in constraints)
+            {
+                if (constraint is IZoneAwareConstraint<TRoomType> zoneAware)
+                {
+                    zoneAware.SetZoneAssignments(zoneAssignments);
                 }
             }
         }
@@ -97,6 +114,7 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
         }
 
         // 4. Assign required room types based on constraints
+        // Process global requirements first
         foreach (var (roomType, count) in roomRequirements.OrderByDescending(r => GetConstraintPriority(r.type, constraints)))
         {
             if (roomType.Equals(spawnType) || roomType.Equals(bossType))
@@ -124,7 +142,50 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                 throw new ConstraintViolationException($"Could only place {assigned}/{count} rooms of type {roomType}");
         }
 
-        // 5. Fill remaining with default type
+        // 5. Assign zone-specific room requirements
+        if (zoneRoomRequirements != null && zoneAssignments != null)
+        {
+            // Collect all zone requirements with their zone IDs
+            var zoneReqsWithZones = new List<(TRoomType type, int count, string zoneId)>();
+            foreach (var (zoneId, zoneReqs) in zoneRoomRequirements)
+            {
+                foreach (var (roomType, count) in zoneReqs)
+                {
+                    if (roomType.Equals(spawnType) || roomType.Equals(bossType))
+                        continue; // Already handled
+                    zoneReqsWithZones.Add((roomType, count, zoneId));
+                }
+            }
+
+            // Process zone requirements ordered by constraint priority
+            foreach (var (roomType, count, zoneId) in zoneReqsWithZones.OrderByDescending(r => GetConstraintPriority(r.type, constraints)))
+            {
+                var typeConstraints = constraints.Where(c => c.TargetRoomType.Equals(roomType)).ToList();
+                int assigned = 0;
+
+                // Only consider nodes in the specific zone
+                var candidates = graph.Nodes
+                    .Where(n => !localAssignments.ContainsKey(n.Id))
+                    .Where(n => zoneAssignments.TryGetValue(n.Id, out var nodeZoneId) && nodeZoneId == zoneId)
+                    .Where(n => typeConstraints.All(c => c.IsValid(n, graph, localAssignments)))
+                    .ToList();
+
+                // Shuffle candidates for randomness
+                Shuffle(candidates, rng);
+
+                foreach (var node in candidates)
+                {
+                    if (assigned >= count) break;
+                    localAssignments[node.Id] = roomType;
+                    assigned++;
+                }
+
+                if (assigned < count)
+                    throw new ConstraintViolationException($"Could only place {assigned}/{count} rooms of type {roomType} in zone {zoneId}");
+            }
+        }
+
+        // 6. Fill remaining with default type
         foreach (var node in graph.Nodes)
         {
             if (!localAssignments.ContainsKey(node.Id))

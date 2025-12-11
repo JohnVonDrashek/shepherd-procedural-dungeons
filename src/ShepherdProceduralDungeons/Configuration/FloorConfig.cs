@@ -58,5 +58,10 @@ public sealed class FloorConfig<TRoomType> where TRoomType : Enum
     /// How to handle non-adjacent room connections.
     /// </summary>
     public HallwayMode HallwayMode { get; init; } = HallwayMode.AsNeeded;
+
+    /// <summary>
+    /// Optional zones for biome/thematic partitioning of the dungeon.
+    /// </summary>
+    public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }
 }
 

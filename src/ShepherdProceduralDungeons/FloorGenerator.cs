@@ -78,7 +78,43 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         var graphGenerator = new GraphGenerator();
         var graph = graphGenerator.Generate(config.RoomCount, config.BranchingFactor, graphRng);
 
-        // 2. Assign room types (pass floor index for floor-aware constraints)
+        // 2. Prepare zone data structures (but don't assign zones yet - need critical path first)
+        Dictionary<int, string>? zoneAssignments = null;
+        Dictionary<string, IReadOnlyList<(TRoomType type, int count)>>? zoneRoomRequirements = null;
+        Dictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>? zoneTemplates = null;
+
+        if (config.Zones != null && config.Zones.Count > 0)
+        {
+            // Build zone-specific room requirements and templates
+            zoneRoomRequirements = new Dictionary<string, IReadOnlyList<(TRoomType type, int count)>>();
+            zoneTemplates = new Dictionary<string, IReadOnlyList<RoomTemplate<TRoomType>>>();
+            
+            foreach (var zone in config.Zones)
+            {
+                if (zone.RoomRequirements != null && zone.RoomRequirements.Count > 0)
+                {
+                    zoneRoomRequirements[zone.Id] = zone.RoomRequirements;
+                }
+                if (zone.Templates != null && zone.Templates.Count > 0)
+                {
+                    zoneTemplates[zone.Id] = zone.Templates;
+                }
+            }
+
+            // For zone-specific room requirements, we need preliminary zone assignments
+            // Assign distance-based zones temporarily (critical path zones will be assigned later)
+            var distanceBasedZones = config.Zones.Where(z => z.Boundary is ZoneBoundary.DistanceBased).ToList();
+            if (distanceBasedZones.Count > 0)
+            {
+                var zoneAssigner = new ZoneAssigner<TRoomType>();
+                // Set a temporary critical path for zone assignment (just start node)
+                graph.CriticalPath = new[] { graph.StartNodeId };
+                graph.Nodes.First(n => n.Id == graph.StartNodeId).IsOnCriticalPath = true;
+                zoneAssignments = zoneAssigner.AssignZones(graph, distanceBasedZones);
+            }
+        }
+
+        // 3. Assign room types (pass floor index and zone info for zone-aware constraints)
         var typeAssigner = new RoomTypeAssigner<TRoomType>();
         typeAssigner.AssignTypes(
             graph,
@@ -89,9 +125,18 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             config.Constraints,
             typeRng,
             out var assignments,
-            floorIndex);
+            floorIndex,
+            zoneAssignments,
+            zoneRoomRequirements);
 
-        // 3. Organize templates by room type
+        // 4. Assign all zones now that critical path is available (in config order, first match wins)
+        if (config.Zones != null && config.Zones.Count > 0)
+        {
+            var zoneAssigner = new ZoneAssigner<TRoomType>();
+            zoneAssignments = zoneAssigner.AssignZones(graph, config.Zones);
+        }
+
+        // 5. Organize templates by room type
         var templatesByType = new Dictionary<TRoomType, List<RoomTemplate<TRoomType>>>();
         foreach (var template in config.Templates)
         {
@@ -113,19 +158,47 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             kvp => kvp.Key,
             kvp => (IReadOnlyList<RoomTemplate<TRoomType>>)kvp.Value);
 
-        // 4. Spatial placement
+        // 6. Spatial placement (with zone-aware template selection)
         var spatialSolver = _spatialSolver ?? new IncrementalSolver<TRoomType>();
+        if (spatialSolver is IncrementalSolver<TRoomType> incrementalSolver)
+        {
+            incrementalSolver.SetZoneInfo(zoneAssignments, zoneTemplates);
+        }
         var placedRooms = spatialSolver.Solve(graph, assignments, templatesByTypeReadOnly, config.HallwayMode, spatialRng);
 
-        // 5. Generate hallways
+        // 7. Generate hallways
         var occupiedCells = new HashSet<Cell>(placedRooms.SelectMany(r => r.GetWorldCells()));
         var hallwayGenerator = new HallwayGenerator<TRoomType>();
         var hallways = hallwayGenerator.Generate(placedRooms, graph, occupiedCells, hallwayRng);
 
-        // 6. Place doors
+        // 8. Place doors
         var doors = PlaceDoors(placedRooms, hallways, graph);
 
-        // 7. Build output
+        // 9. Identify transition rooms (rooms connecting different zones)
+        var transitionRooms = new List<PlacedRoom<TRoomType>>();
+        if (zoneAssignments != null && zoneAssignments.Count > 0)
+        {
+            foreach (var room in placedRooms)
+            {
+                if (!zoneAssignments.TryGetValue(room.NodeId, out var roomZone))
+                    continue;
+
+                // Check if this room connects to rooms in different zones
+                var roomNode = graph.Nodes.First(n => n.Id == room.NodeId);
+                var hasDifferentZoneConnection = roomNode.Connections.Any(conn =>
+                {
+                    var otherNodeId = conn.GetOtherNodeId(room.NodeId);
+                    return zoneAssignments.TryGetValue(otherNodeId, out var otherZone) && otherZone != roomZone;
+                });
+
+                if (hasDifferentZoneConnection)
+                {
+                    transitionRooms.Add(room);
+                }
+            }
+        }
+
+        // 10. Build output
         return new FloorLayout<TRoomType>
         {
             Rooms = placedRooms,
@@ -134,7 +207,9 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             Seed = config.Seed,
             CriticalPath = graph.CriticalPath,
             SpawnRoomId = graph.StartNodeId,
-            BossRoomId = graph.BossNodeId
+            BossRoomId = graph.BossNodeId,
+            ZoneAssignments = zoneAssignments,
+            TransitionRooms = transitionRooms
         };
     }
 
@@ -151,7 +226,39 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         foreach (var req in config.RoomRequirements)
             requiredTypes.Add(req.Type);
 
+        // Include zone-specific room requirements
+        if (config.Zones != null)
+        {
+            foreach (var zone in config.Zones)
+            {
+                if (zone.RoomRequirements != null)
+                {
+                    foreach (var req in zone.RoomRequirements)
+                    {
+                        requiredTypes.Add(req.Type);
+                    }
+                }
+            }
+        }
+
+        // Collect all available templates (global + zone-specific)
         var availableTypes = config.Templates.SelectMany(t => t.ValidRoomTypes).ToHashSet();
+        if (config.Zones != null)
+        {
+            foreach (var zone in config.Zones)
+            {
+                if (zone.Templates != null)
+                {
+                    foreach (var template in zone.Templates)
+                    {
+                        foreach (var roomType in template.ValidRoomTypes)
+                        {
+                            availableTypes.Add(roomType);
+                        }
+                    }
+                }
+            }
+        }
 
         foreach (var required in requiredTypes)
         {

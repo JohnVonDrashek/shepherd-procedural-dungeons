@@ -212,6 +212,144 @@ HallwayMode = HallwayMode.AsNeeded
 
 See [Hallway Modes](Hallway-Modes) for details.
 
+### Zones
+
+```csharp
+Zones = new[]
+{
+    new Zone<RoomType>
+    {
+        Id = "castle",
+        Name = "Castle",
+        Boundary = new ZoneBoundary.DistanceBased
+        {
+            MinDistance = 0,
+            MaxDistance = 3
+        }
+    }
+}
+```
+
+**Type:** `IReadOnlyList<Zone<TRoomType>>?`
+
+**Default:** `null` (zones are optional)
+
+**Description:** Optional biome/thematic zones that partition the dungeon into distinct regions with different generation rules.
+
+**Zone Properties:**
+- `Id` (required) - Unique identifier for the zone
+- `Name` (required) - Display name for the zone
+- `Boundary` (required) - Defines which rooms belong to this zone
+- `RoomRequirements` (optional) - Zone-specific room type requirements
+- `Constraints` (optional) - Zone-specific constraints
+- `Templates` (optional) - Zone-specific template pool (preferred over global templates)
+
+**Zone Boundaries:**
+
+1. **Distance-Based** - Rooms assigned based on distance from spawn:
+   ```csharp
+   Boundary = new ZoneBoundary.DistanceBased
+   {
+       MinDistance = 0,  // Inclusive
+       MaxDistance = 3   // Inclusive
+   }
+   ```
+
+2. **Critical Path-Based** - Rooms assigned based on position along critical path:
+   ```csharp
+   Boundary = new ZoneBoundary.CriticalPathBased
+   {
+       StartPercent = 0.0f,  // 0.0 to 1.0
+       EndPercent = 0.5f     // 0.0 to 1.0
+   }
+   ```
+
+**Zone Assignment:**
+- Zones are assigned after graph generation but before room type assignment
+- Rooms are assigned to zones based on their boundaries
+- If zones overlap, the first zone in the list takes precedence (first match wins)
+- Zone assignments are deterministic (same seed = same assignments)
+
+**Zone-Specific Features:**
+- **Room Requirements**: Zones can have their own room type requirements in addition to global requirements
+- **Constraints**: Zones can have zone-specific constraints that apply only to rooms in that zone
+- **Templates**: Zones can have their own template pools; rooms in a zone prefer zone-specific templates, falling back to global templates if none available
+
+**Example:**
+```csharp
+var castleZone = new Zone<RoomType>
+{
+    Id = "castle",
+    Name = "Castle",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1)  // One shop in castle zone
+    },
+    Templates = new[] { castleTemplate }  // Prefer castle templates
+};
+
+var dungeonZone = new Zone<RoomType>
+{
+    Id = "dungeon",
+    Name = "Dungeon",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 4,
+        MaxDistance = 7
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "dungeon")
+    }
+};
+
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    Zones = new[] { castleZone, dungeonZone }
+};
+```
+
+**Accessing Zone Assignments:**
+
+After generation, zone assignments are available in `FloorLayout`:
+
+```csharp
+var layout = generator.Generate(config);
+
+// Check which zone a room belongs to
+if (layout.ZoneAssignments != null)
+{
+    foreach (var room in layout.Rooms)
+    {
+        if (layout.ZoneAssignments.TryGetValue(room.NodeId, out var zoneId))
+        {
+            Console.WriteLine($"Room {room.NodeId} is in zone {zoneId}");
+        }
+    }
+    
+    // Get transition rooms (rooms connecting different zones)
+    foreach (var transition in layout.TransitionRooms)
+    {
+        Console.WriteLine($"Transition room: {transition.NodeId}");
+    }
+}
+```
+
+**Tips:**
+- Use zones to create distinct areas with different themes (e.g., castle vs. dungeon)
+- Zone-specific templates allow visual variety per zone
+- Zone-aware constraints (like `OnlyInZoneConstraint`) enable fine-grained control
+- Transition rooms are automatically identified for special handling (e.g., zone transition effects)
+- Zones are optional - dungeons without zones work exactly as before
+
+See [Advanced Topics](Advanced-Topics#zones) for more details on zones.
+
 ## Complete Example
 
 ```csharp

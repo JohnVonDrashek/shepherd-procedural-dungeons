@@ -1241,6 +1241,216 @@ public class DungeonManager
 }
 ```
 
+## Zones Example
+
+Example using biome/thematic zones to create distinct dungeon areas:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Create zone-specific templates
+var castleTemplate = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("castle-ornate")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .Build();
+
+var dungeonTemplate = RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+    .WithId("dungeon-rough")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .Build();
+
+// Global templates (fallback)
+var globalTemplates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("combat-default")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+// Define zones
+var castleZone = new Zone<RoomType>
+{
+    Id = "castle",
+    Name = "Castle",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1)  // One shop in castle zone
+    },
+    Templates = new[] { castleTemplate }  // Prefer ornate castle templates
+};
+
+var dungeonZone = new Zone<RoomType>
+{
+    Id = "dungeon",
+    Name = "Dungeon",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 4,
+        MaxDistance = 7
+    },
+    Templates = new[] { dungeonTemplate },  // Prefer rough dungeon templates
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        // Boss only in dungeon zone
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "dungeon")
+    }
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = globalTemplates,
+    Zones = new[] { castleZone, dungeonZone },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 2)
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
+    }
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Access zone assignments
+if (layout.ZoneAssignments != null)
+{
+    Console.WriteLine("Zone Assignments:");
+    foreach (var room in layout.Rooms)
+    {
+        if (layout.ZoneAssignments.TryGetValue(room.NodeId, out var zoneId))
+        {
+            Console.WriteLine($"Room {room.NodeId} ({room.RoomType}) is in zone: {zoneId}");
+        }
+    }
+    
+    // Get rooms by zone
+    var castleRooms = layout.Rooms.Where(r => 
+        layout.ZoneAssignments.TryGetValue(r.NodeId, out var z) && z == "castle").ToList();
+    var dungeonRooms = layout.Rooms.Where(r => 
+        layout.ZoneAssignments.TryGetValue(r.NodeId, out var z) && z == "dungeon").ToList();
+    
+    Console.WriteLine($"Castle zone: {castleRooms.Count} rooms");
+    Console.WriteLine($"Dungeon zone: {dungeonRooms.Count} rooms");
+    
+    // Transition rooms (connect different zones)
+    Console.WriteLine($"Transition rooms: {layout.TransitionRooms.Count}");
+    foreach (var transition in layout.TransitionRooms)
+    {
+        Console.WriteLine($"  Transition room: {transition.NodeId} ({transition.RoomType})");
+    }
+}
+
+// Verify zone-specific constraints
+var shopRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Shop).ToList();
+foreach (var shop in shopRooms)
+{
+    var zoneId = layout.ZoneAssignments?[shop.NodeId];
+    Console.WriteLine($"Shop at node {shop.NodeId} is in zone: {zoneId}");
+    // Shop should be in castle zone (due to RoomRequirements)
+}
+
+var bossRoom = layout.Rooms.First(r => r.RoomType == RoomType.Boss);
+var bossZoneId = layout.ZoneAssignments?[bossRoom.NodeId];
+Console.WriteLine($"Boss at node {bossRoom.NodeId} is in zone: {bossZoneId}");
+// Boss should be in dungeon zone (due to OnlyInZoneConstraint)
+```
+
+This example demonstrates:
+- **Distance-based zones**: Castle zone (distance 0-3) and Dungeon zone (distance 4-7)
+- **Zone-specific templates**: Castle uses ornate templates, dungeon uses rough templates
+- **Zone-specific room requirements**: Shop required in castle zone
+- **Zone-aware constraints**: Boss only in dungeon zone
+- **Transition rooms**: Automatically identified rooms connecting different zones
+
+## Critical Path-Based Zones Example
+
+Example using critical path-based zones:
+
+```csharp
+// Define zones based on critical path position
+var earlyZone = new Zone<RoomType>
+{
+    Id = "early",
+    Name = "Early Zone",
+    Boundary = new ZoneBoundary.CriticalPathBased
+    {
+        StartPercent = 0.0f,
+        EndPercent = 0.4f  // First 40% of critical path
+    },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1)  // Shop in early zone
+    }
+};
+
+var lateZone = new Zone<RoomType>
+{
+    Id = "late",
+    Name = "Late Zone",
+    Boundary = new ZoneBoundary.CriticalPathBased
+    {
+        StartPercent = 0.6f,
+        EndPercent = 1.0f  // Last 40% of critical path
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "late")
+    }
+};
+
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    Zones = new[] { earlyZone, lateZone }
+};
+```
+
+This creates zones based on progression along the critical path, ensuring shops appear early and boss appears late.
+
 ## Testing Example
 
 Example of testing dungeon generation:

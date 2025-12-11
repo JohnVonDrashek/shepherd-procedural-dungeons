@@ -430,9 +430,13 @@ public class RoomTemplateWeightingTests
         IReadOnlyDictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>> templates,
         Random rng)
     {
+        // Get the 3-parameter overload (without zone parameters)
         var method = typeof(IncrementalSolver<TestHelpers.RoomType>).GetMethod(
             "SelectTemplate",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+            null,
+            new Type[] { typeof(TestHelpers.RoomType), typeof(IReadOnlyDictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>), typeof(Random) },
+            null);
 
         if (method == null)
             throw new InvalidOperationException("SelectTemplate method not found");

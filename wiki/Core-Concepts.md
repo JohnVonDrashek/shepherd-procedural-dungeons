@@ -234,6 +234,51 @@ Placed rooms use **world coordinates**:
 // World cell is (5 + 1, 10 + 2) = (6, 12)
 ```
 
+## Zones
+
+### What They Are
+
+Zones partition the dungeon into distinct regions with different generation rules. They enable:
+- **Visual variety**: Different zones can have distinct visual themes
+- **Gameplay depth**: Zones can affect difficulty, enemy types, and room characteristics
+- **Narrative structure**: Zones enable storytelling through spatial design
+
+### Zone Boundaries
+
+Zones use boundaries to determine which rooms belong to them:
+
+1. **Distance-Based**: Rooms assigned based on distance from spawn
+   ```csharp
+   Boundary = new ZoneBoundary.DistanceBased
+   {
+       MinDistance = 0,
+       MaxDistance = 3
+   }
+   ```
+
+2. **Critical Path-Based**: Rooms assigned based on position along critical path
+   ```csharp
+   Boundary = new ZoneBoundary.CriticalPathBased
+   {
+       StartPercent = 0.0f,
+       EndPercent = 0.5f
+   }
+   ```
+
+### Zone Features
+
+Zones can have:
+- **Zone-specific room requirements**: Additional room types required in that zone
+- **Zone-specific constraints**: Constraints that apply only to rooms in that zone
+- **Zone-specific templates**: Template pools preferred for rooms in that zone
+
+### Zone Assignment
+
+- Zones are assigned after graph generation but before room type assignment
+- If zones overlap, the first zone in the list takes precedence
+- Zone assignments are deterministic (same seed = same assignments)
+- Transition rooms (connecting different zones) are automatically identified
+
 ## Generation Pipeline
 
 ```
@@ -241,17 +286,21 @@ Placed rooms use **world coordinates**:
    ↓
 2. Generate Graph (topology)
    ↓
-3. Assign Room Types (with constraints)
+3. Assign Zones (if configured)
    ↓
-4. Select Templates (random per type)
+4. Assign Room Types (with constraints, including zone-aware)
    ↓
-5. Place Rooms (spatial solver)
+5. Select Templates (prefer zone-specific, fallback to global)
    ↓
-6. Generate Hallways (if needed)
+6. Place Rooms (spatial solver)
    ↓
-7. Place Doors
+7. Generate Hallways (if needed)
    ↓
-8. Return FloorLayout
+8. Place Doors
+   ↓
+9. Identify Transition Rooms (if zones configured)
+   ↓
+10. Return FloorLayout
 ```
 
 ## Key Principles

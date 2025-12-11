@@ -44,6 +44,16 @@ public sealed class FloorLayout<TRoomType> where TRoomType : Enum
     public required int BossRoomId { get; init; }
 
     /// <summary>
+    /// Zone assignments for rooms (node ID -> zone ID). Null if no zones configured.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? ZoneAssignments { get; init; }
+
+    /// <summary>
+    /// Rooms that connect different zones (transition rooms). Empty if no zones configured.
+    /// </summary>
+    public IReadOnlyList<PlacedRoom<TRoomType>> TransitionRooms { get; init; } = Array.Empty<PlacedRoom<TRoomType>>();
+
+    /// <summary>
     /// Gets a room by its node ID.
     /// </summary>
     public PlacedRoom<TRoomType>? GetRoom(int nodeId) => Rooms.FirstOrDefault(r => r.NodeId == nodeId);

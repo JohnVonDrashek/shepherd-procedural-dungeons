@@ -148,6 +148,7 @@ public IReadOnlyList<(TRoomType Type, int Count)> RoomRequirements { get; init; 
 public IReadOnlyList<IConstraint<TRoomType>> Constraints { get; init; }
 public float BranchingFactor { get; init; }  // Default: 0.3f
 public HallwayMode HallwayMode { get; init; }  // Default: HallwayMode.AsNeeded
+public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }  // Optional zones
 ```
 
 ## FloorLayout<TRoomType>
@@ -164,6 +165,8 @@ public required int Seed { get; init; }
 public required IReadOnlyList<int> CriticalPath { get; init; }
 public required int SpawnRoomId { get; init; }
 public required int BossRoomId { get; init; }
+public IReadOnlyDictionary<int, string>? ZoneAssignments { get; init; }  // Node ID -> Zone ID
+public IReadOnlyList<PlacedRoom<TRoomType>> TransitionRooms { get; init; }  // Rooms connecting zones
 ```
 
 ### Methods
@@ -521,6 +524,20 @@ public class CustomConstraint<TRoomType> : IConstraint<TRoomType>
 }
 ```
 
+#### OnlyInZoneConstraint
+
+```csharp
+public class OnlyInZoneConstraint<TRoomType> : IConstraint<TRoomType>, IZoneAwareConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public string ZoneId { get; }
+    
+    public OnlyInZoneConstraint(TRoomType targetRoomType, string zoneId);
+}
+```
+
+**Use case:** Restrict room types to specific zones (e.g., shops only in market zone).
+
 ## Hallway
 
 Generated hallway connecting rooms.
@@ -722,6 +739,62 @@ public interface ISpatialSolver<TRoomType> where TRoomType : Enum
         Random rng);
 }
 ```
+
+## Zone<TRoomType>
+
+Represents a biome or thematic zone within a dungeon floor.
+
+### Properties
+
+```csharp
+public required string Id { get; init; }
+public required string Name { get; init; }
+public required ZoneBoundary Boundary { get; init; }
+public IReadOnlyList<(TRoomType Type, int Count)>? RoomRequirements { get; init; }
+public IReadOnlyList<IConstraint<TRoomType>>? Constraints { get; init; }
+public IReadOnlyList<RoomTemplate<TRoomType>>? Templates { get; init; }
+```
+
+## ZoneBoundary
+
+Base class for zone boundary definitions. Determines which rooms belong to a zone.
+
+### DistanceBased
+
+```csharp
+public sealed class DistanceBased : ZoneBoundary
+{
+    public required int MinDistance { get; init; }
+    public required int MaxDistance { get; init; }
+}
+```
+
+Assigns rooms based on distance from start node.
+
+### CriticalPathBased
+
+```csharp
+public sealed class CriticalPathBased : ZoneBoundary
+{
+    public required float StartPercent { get; init; }
+    public required float EndPercent { get; init; }
+}
+```
+
+Assigns rooms based on position along critical path (0.0 to 1.0).
+
+## IZoneAwareConstraint<TRoomType>
+
+Interface for constraints that need to check zone assignments.
+
+```csharp
+public interface IZoneAwareConstraint<TRoomType> where TRoomType : Enum
+{
+    void SetZoneAssignments(IReadOnlyDictionary<int, string> zoneAssignments);
+}
+```
+
+**Use case:** Implement zone-aware constraints that need to know which zone a room belongs to.
 
 ## Namespaces
 

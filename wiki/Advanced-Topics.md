@@ -642,10 +642,250 @@ var layout = generator.Generate(singleFloorConfig);
 4. **Test determinism** - Verify same seed produces same layout
 5. **Validate connections** - Ensure room IDs exist on their floors
 
+## Zones
+
+Zones enable partitioning dungeons into distinct biome/thematic regions with different generation rules.
+
+### Basic Zone Setup
+
+```csharp
+var castleZone = new Zone<RoomType>
+{
+    Id = "castle",
+    Name = "Castle",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    }
+};
+
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    Zones = new[] { castleZone }
+};
+```
+
+### Zone Boundaries
+
+**Distance-Based Zones:**
+```csharp
+Boundary = new ZoneBoundary.DistanceBased
+{
+    MinDistance = 0,  // Inclusive
+    MaxDistance = 3   // Inclusive
+}
+```
+
+Assigns rooms based on their distance from the spawn node. Useful for creating zones that progress from start to end.
+
+**Critical Path-Based Zones:**
+```csharp
+Boundary = new ZoneBoundary.CriticalPathBased
+{
+    StartPercent = 0.0f,  // 0.0 to 1.0
+    EndPercent = 0.5f     // 0.0 to 1.0
+}
+```
+
+Assigns rooms based on their position along the critical path (spawn to boss). Useful for creating zones based on progression rather than distance.
+
+### Zone-Specific Room Requirements
+
+Zones can have their own room type requirements in addition to global requirements:
+
+```csharp
+var marketZone = new Zone<RoomType>
+{
+    Id = "market",
+    Name = "Market",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    },
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 2)  // Two shops required in market zone
+    }
+};
+```
+
+### Zone-Specific Templates
+
+Zones can have their own template pools. Rooms in a zone prefer zone-specific templates, falling back to global templates if none available:
+
+```csharp
+var castleTemplate = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("castle-ornate")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .Build();
+
+var castleZone = new Zone<RoomType>
+{
+    Id = "castle",
+    Name = "Castle",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 3
+    },
+    Templates = new[] { castleTemplate }  // Prefer ornate templates
+};
+```
+
+### Zone-Aware Constraints
+
+Use zone-aware constraints to restrict room types to specific zones:
+
+```csharp
+var dungeonZone = new Zone<RoomType>
+{
+    Id = "dungeon",
+    Name = "Dungeon",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 4,
+        MaxDistance = 7
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "dungeon")
+    }
+};
+```
+
+### Accessing Zone Assignments
+
+After generation, zone assignments are available in `FloorLayout`:
+
+```csharp
+var layout = generator.Generate(config);
+
+// Check zone assignments
+if (layout.ZoneAssignments != null)
+{
+    foreach (var room in layout.Rooms)
+    {
+        if (layout.ZoneAssignments.TryGetValue(room.NodeId, out var zoneId))
+        {
+            Console.WriteLine($"Room {room.NodeId} is in zone {zoneId}");
+        }
+    }
+    
+    // Get transition rooms (rooms connecting different zones)
+    foreach (var transition in layout.TransitionRooms)
+    {
+        Console.WriteLine($"Transition room: {transition.NodeId}");
+    }
+}
+```
+
+### Zone Overlap Handling
+
+If zones overlap, the first zone in the list takes precedence (first match wins):
+
+```csharp
+var zone1 = new Zone<RoomType>
+{
+    Id = "zone1",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 0,
+        MaxDistance = 5
+    }
+};
+
+var zone2 = new Zone<RoomType>
+{
+    Id = "zone2",
+    Boundary = new ZoneBoundary.DistanceBased
+    {
+        MinDistance = 3,  // Overlaps with zone1
+        MaxDistance = 7
+    }
+};
+
+// zone1 comes first, so rooms at distance 3-5 will be in zone1
+Zones = new[] { zone1, zone2 }
+```
+
+### Transition Rooms
+
+Transition rooms (rooms connecting different zones) are automatically identified:
+
+```csharp
+foreach (var transition in layout.TransitionRooms)
+{
+    // This room connects different zones
+    // Useful for special effects, visual transitions, etc.
+    ApplyZoneTransitionEffect(transition);
+}
+```
+
+### Best Practices
+
+1. **Use distance-based zones** for progression-based zones (early/mid/late game)
+2. **Use critical path-based zones** for story-based zones (tutorial/boss areas)
+3. **Zone-specific templates** for visual variety per zone
+4. **Zone-aware constraints** for fine-grained control
+5. **Transition rooms** for special effects between zones
+6. **Test determinism** - same seed should produce same zone assignments
+
+### Common Patterns
+
+**Castle to Dungeon Progression:**
+```csharp
+var castleZone = new Zone<RoomType>
+{
+    Id = "castle",
+    Boundary = new ZoneBoundary.DistanceBased { MinDistance = 0, MaxDistance = 3 },
+    Templates = new[] { castleTemplates }
+};
+
+var dungeonZone = new Zone<RoomType>
+{
+    Id = "dungeon",
+    Boundary = new ZoneBoundary.DistanceBased { MinDistance = 4, MaxDistance = 10 },
+    Templates = new[] { dungeonTemplates },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "dungeon")
+    }
+};
+```
+
+**Early/Mid/Late Zones:**
+```csharp
+var earlyZone = new Zone<RoomType>
+{
+    Id = "early",
+    Boundary = new ZoneBoundary.CriticalPathBased { StartPercent = 0.0f, EndPercent = 0.33f }
+};
+
+var midZone = new Zone<RoomType>
+{
+    Id = "mid",
+    Boundary = new ZoneBoundary.CriticalPathBased { StartPercent = 0.33f, EndPercent = 0.66f }
+};
+
+var lateZone = new Zone<RoomType>
+{
+    Id = "late",
+    Boundary = new ZoneBoundary.CriticalPathBased { StartPercent = 0.66f, EndPercent = 1.0f },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new OnlyInZoneConstraint<RoomType>(RoomType.Boss, "late")
+    }
+};
+```
+
 ## Next Steps
 
 - **[Best Practices](Best-Practices)** - Apply these patterns
 - **[API Reference](API-Reference)** - Complete API documentation
-- **[Examples](Examples)** - See advanced patterns in action, including multi-floor examples
-- **[Configuration](Configuration)** - Learn about MultiFloorConfig
+- **[Examples](Examples)** - See advanced patterns in action, including multi-floor and zones examples
+- **[Configuration](Configuration)** - Learn about FloorConfig and zones
 
