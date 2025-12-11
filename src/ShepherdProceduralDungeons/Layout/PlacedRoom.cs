@@ -47,5 +47,18 @@ public sealed class PlacedRoom<TRoomType> where TRoomType : Enum
             yield return (localCell, worldCell, edge);
         }
     }
+
+    /// <summary>
+    /// Gets all interior features in world coordinates.
+    /// Returns tuples of (world cell, feature type).
+    /// </summary>
+    public IEnumerable<(Cell WorldCell, InteriorFeature Feature)> GetInteriorFeatures()
+    {
+        foreach (var (localCell, feature) in Template.InteriorFeatures)
+        {
+            Cell worldCell = new Cell(Position.X + localCell.X, Position.Y + localCell.Y);
+            yield return (worldCell, feature);
+        }
+    }
 }
 

@@ -30,13 +30,36 @@ public sealed class RoomTemplateJsonConverter<TRoomType> : JsonConverter<RoomTem
         var cells = ParseShape(shapeType, shapeElement);
         var doorEdges = ParseDoorEdges(root, cells, options);
 
+        // Parse interior features if present
+        var interiorFeatures = new Dictionary<Cell, InteriorFeature>();
+        if (root.TryGetProperty("interiorFeatures", out var interiorFeaturesElement))
+        {
+            var featuresObj = interiorFeaturesElement.Deserialize<Dictionary<string, string>>(options);
+            if (featuresObj != null)
+            {
+                foreach (var kvp in featuresObj)
+                {
+                    var cellParts = kvp.Key.Split(',');
+                    if (cellParts.Length == 2 && int.TryParse(cellParts[0], out var x) && int.TryParse(cellParts[1], out var y))
+                    {
+                        var cell = new Cell(x, y);
+                        if (cells.Contains(cell) && Enum.TryParse<InteriorFeature>(kvp.Value, true, out var feature))
+                        {
+                            interiorFeatures[cell] = feature;
+                        }
+                    }
+                }
+            }
+        }
+
         return new RoomTemplate<TRoomType>
         {
             Id = id,
             ValidRoomTypes = new HashSet<TRoomType>(validRoomTypes),
             Cells = new HashSet<Cell>(cells),
             DoorEdges = doorEdges,
-            Weight = weight
+            Weight = weight,
+            InteriorFeatures = interiorFeatures
         };
     }
 
@@ -55,6 +78,19 @@ public sealed class RoomTemplateJsonConverter<TRoomType> : JsonConverter<RoomTem
         // Write door edges
         writer.WritePropertyName("doorEdges");
         WriteDoorEdges(writer, value, options);
+
+        // Write interior features if any
+        if (value.InteriorFeatures.Count > 0)
+        {
+            writer.WritePropertyName("interiorFeatures");
+            writer.WriteStartObject();
+            foreach (var kvp in value.InteriorFeatures)
+            {
+                var key = $"{kvp.Key.X},{kvp.Key.Y}";
+                writer.WriteString(key, kvp.Value.ToString());
+            }
+            writer.WriteEndObject();
+        }
 
         writer.WriteEndObject();
     }

@@ -2174,6 +2174,151 @@ var generator = new FloorGenerator<RoomType>();
 var layout = generator.Generate(config);
 ```
 
+## Interior Features Example
+
+Example using interior features to create rooms with obstacles and decorative elements:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Special
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Spawn
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    // Boss
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    // Combat room with pillars for cover
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-with-pillars")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .AddInteriorFeature(1, 1, InteriorFeature.Pillar)
+        .AddInteriorFeature(3, 1, InteriorFeature.Pillar)
+        .AddInteriorFeature(1, 3, InteriorFeature.Pillar)
+        .AddInteriorFeature(3, 3, InteriorFeature.Pillar)
+        .Build(),
+    
+    // Temple room with altar and hazards
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("temple-room")
+        .ForRoomTypes(RoomType.Special)
+        .WithDoorsOnSides(Edge.South)
+        .AddInteriorFeature(2, 2, InteriorFeature.Pillar)
+        .AddInteriorFeature(3, 2, InteriorFeature.Pillar)
+        .AddInteriorFeature(2, 3, InteriorFeature.Decorative)  // Altar
+        .AddInteriorFeature(3, 3, InteriorFeature.Decorative)
+        .AddInteriorFeature(4, 4, InteriorFeature.Hazard)  // Trap
+        .Build(),
+    
+    // Room with interior walls
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 4)
+        .WithId("divided-room")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .AddInteriorFeature(2, 1, InteriorFeature.Wall)
+        .AddInteriorFeature(2, 2, InteriorFeature.Wall)
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 12,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    RoomRequirements = new[]
+    {
+        (RoomType.Special, 1)
+    },
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Access interior features
+foreach (var room in layout.Rooms)
+{
+    Console.WriteLine($"Room {room.NodeId} ({room.RoomType}):");
+    foreach (var (worldCell, feature) in room.GetInteriorFeatures())
+    {
+        Console.WriteLine($"  {feature} at ({worldCell.X}, {worldCell.Y})");
+    }
+}
+
+// Get all hazards in the dungeon
+var hazards = layout.InteriorFeatures
+    .Where(f => f.Feature == InteriorFeature.Hazard)
+    .ToList();
+Console.WriteLine($"Total hazards: {hazards.Count}");
+```
+
+### Rendering Interior Features
+
+```csharp
+var layout = generator.Generate(config);
+var (min, max) = layout.GetBounds();
+
+// Render rooms
+foreach (var room in layout.Rooms)
+{
+    foreach (var cell in room.GetWorldCells())
+    {
+        int screenX = cell.X - min.X;
+        int screenY = cell.Y - min.Y;
+        RenderTile(screenX, screenY, GetTileForRoomType(room.RoomType));
+    }
+}
+
+// Render interior features
+foreach (var (worldCell, feature) in layout.InteriorFeatures)
+{
+    int screenX = worldCell.X - min.X;
+    int screenY = worldCell.Y - min.Y;
+    
+    switch (feature)
+    {
+        case InteriorFeature.Pillar:
+            RenderTile(screenX, screenY, TileType.Pillar);
+            break;
+        case InteriorFeature.Wall:
+            RenderTile(screenX, screenY, TileType.InteriorWall);
+            break;
+        case InteriorFeature.Hazard:
+            RenderTile(screenX, screenY, TileType.Hazard);
+            break;
+        case InteriorFeature.Decorative:
+            RenderTile(screenX, screenY, TileType.Decorative);
+            break;
+    }
+}
+```
+
+This example demonstrates:
+- **Pillars for cover**: Combat rooms with pillars that provide tactical cover
+- **Decorative elements**: Temple rooms with altars and thematic features
+- **Environmental hazards**: Traps and hazards that add danger
+- **Interior walls**: Rooms divided by walls for tactical positioning
+
 ## Graph Generation Algorithms
 
 The library supports multiple graph generation algorithms, each producing different connectivity patterns. Here are examples for each algorithm:

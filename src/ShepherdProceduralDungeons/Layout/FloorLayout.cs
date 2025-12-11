@@ -99,5 +99,11 @@ public sealed class FloorLayout<TRoomType> where TRoomType : Enum
 
         return (new Cell(minX, minY), new Cell(maxX, maxY));
     }
+
+    /// <summary>
+    /// Gets all interior features from all rooms in world coordinates.
+    /// </summary>
+    public IEnumerable<(Cell WorldCell, InteriorFeature Feature)> InteriorFeatures =>
+        Rooms.SelectMany(r => r.GetInteriorFeatures());
 }
 

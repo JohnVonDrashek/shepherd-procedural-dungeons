@@ -435,6 +435,200 @@ RoomTemplateBuilder<RoomType>.LShape(4, 3, 2, 1, Corner.TopRight)
     .Build();
 ```
 
+## Interior Features
+
+Room templates can define interior obstacles and features such as pillars, walls, hazards, and decorative elements. These features are placed at specific cells within the template and are preserved when rooms are placed in the dungeon.
+
+### Feature Types
+
+The `InteriorFeature` enum provides four feature types:
+
+- **`Pillar`** - Obstacles that block movement but not line of sight (useful for cover mechanics)
+- **`Wall`** - Interior walls that create sub-areas within rooms (tactical positioning)
+- **`Hazard`** - Special cells that might contain traps, lava, spikes, etc. (environmental hazards)
+- **`Decorative`** - Visual markers for special areas (altars, fountains, etc.) (thematic variety)
+
+### Adding Interior Features
+
+Use `AddInteriorFeature()` to place features at specific template-local coordinates:
+
+```csharp
+var template = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("combat-with-pillars")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(2, 2, InteriorFeature.Pillar)
+    .AddInteriorFeature(2, 4, InteriorFeature.Pillar)
+    .AddInteriorFeature(4, 2, InteriorFeature.Pillar)
+    .AddInteriorFeature(4, 4, InteriorFeature.Pillar)
+    .Build();
+```
+
+This creates a 5×5 combat room with pillars at the four corners (interior cells only).
+
+### Multiple Feature Types
+
+You can mix different feature types in a single template:
+
+```csharp
+var template = RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+    .WithId("temple-room")
+    .ForRoomTypes(RoomType.Special)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(2, 2, InteriorFeature.Pillar)
+    .AddInteriorFeature(3, 2, InteriorFeature.Wall)  // Interior wall
+    .AddInteriorFeature(2, 3, InteriorFeature.Wall)
+    .AddInteriorFeature(3, 3, InteriorFeature.Decorative)  // Altar in center
+    .AddInteriorFeature(4, 4, InteriorFeature.Hazard)  // Trap near altar
+    .Build();
+```
+
+### Feature Placement Rules
+
+**Important constraints:**
+- Features must be placed **within** the template's cell bounds
+- Features **cannot** be placed on exterior edges (where doors might be)
+- Features are defined in **template-local coordinates** (relative to anchor)
+
+**Example - Invalid placement:**
+
+```csharp
+// ❌ Error: Feature on exterior edge
+RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("invalid")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(0, 2, InteriorFeature.Pillar)  // On left edge - invalid!
+    .Build();
+
+// ❌ Error: Feature outside template bounds
+.AddInteriorFeature(10, 10, InteriorFeature.Pillar)  // Outside 5×5 template - invalid!
+```
+
+**Example - Valid placement:**
+
+```csharp
+// ✓ Valid: Features in interior cells only
+RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("valid")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(1, 1, InteriorFeature.Pillar)  // Interior cell
+    .AddInteriorFeature(3, 3, InteriorFeature.Hazard)  // Interior cell
+    .Build();
+```
+
+### Accessing Interior Features
+
+After generation, interior features are available in world coordinates:
+
+```csharp
+var layout = generator.Generate(config);
+
+// Get features for a specific room
+var room = layout.Rooms[0];
+foreach (var (worldCell, feature) in room.GetInteriorFeatures())
+{
+    Console.WriteLine($"Feature {feature} at world cell ({worldCell.X}, {worldCell.Y})");
+}
+
+// Get all features across all rooms
+foreach (var (worldCell, feature) in layout.InteriorFeatures)
+{
+    RenderFeature(worldCell.X, worldCell.Y, feature);
+}
+```
+
+See **[Working with Output](Working-with-Output)** for more details on accessing interior features.
+
+### Use Cases
+
+**Combat Rooms with Cover:**
+```csharp
+RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("combat-cover")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(1, 1, InteriorFeature.Pillar)
+    .AddInteriorFeature(3, 1, InteriorFeature.Pillar)
+    .AddInteriorFeature(1, 3, InteriorFeature.Pillar)
+    .AddInteriorFeature(3, 3, InteriorFeature.Pillar)
+    .Build();
+```
+
+**Temple Room with Altar:**
+```csharp
+RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+    .WithId("temple-altar")
+    .ForRoomTypes(RoomType.Special)
+    .WithDoorsOnSides(Edge.South)
+    .AddInteriorFeature(1, 1, InteriorFeature.Decorative)  // Altar
+    .AddInteriorFeature(2, 1, InteriorFeature.Decorative)
+    .Build();
+```
+
+**Hazardous Room:**
+```csharp
+RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+    .WithId("hazard-room")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(1, 1, InteriorFeature.Hazard)  // Lava pit
+    .AddInteriorFeature(2, 2, InteriorFeature.Hazard)  // Spike trap
+    .Build();
+```
+
+**Room with Interior Walls:**
+```csharp
+RoomTemplateBuilder<RoomType>.Rectangle(6, 4)
+    .WithId("divided-room")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(2, 1, InteriorFeature.Wall)  // Wall dividing room
+    .AddInteriorFeature(2, 2, InteriorFeature.Wall)
+    .Build();
+```
+
+### Backward Compatibility
+
+Templates without interior features continue to work identically:
+
+```csharp
+// This template has no interior features (backward compatible)
+var template = RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+    .WithId("simple")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .Build();
+
+// InteriorFeatures is empty but valid
+Assert.Empty(template.InteriorFeatures);
+```
+
+### Serialization
+
+Interior features are serialized and deserialized correctly in JSON configurations:
+
+```csharp
+var template = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("serializable")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(1, 1, InteriorFeature.Pillar)
+    .AddInteriorFeature(3, 3, InteriorFeature.Hazard)
+    .Build();
+
+var config = new FloorConfig<RoomType> { /* ... */ Templates = new[] { template } };
+
+// Serialize
+string json = config.ToJson();
+
+// Deserialize - features are preserved
+var loadedConfig = FloorConfig<RoomType>.FromJson<RoomType>(json);
+var loadedTemplate = loadedConfig.Templates.First(t => t.Id == "serializable");
+Assert.Equal(2, loadedTemplate.InteriorFeatures.Count);
+```
+
 ## Tips
 
 1. **Start simple**: Use rectangles for most rooms, add complexity later

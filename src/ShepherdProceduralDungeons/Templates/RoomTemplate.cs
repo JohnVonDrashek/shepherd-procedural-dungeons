@@ -34,6 +34,11 @@ public sealed class RoomTemplate<TRoomType> where TRoomType : Enum
     public double Weight { get; init; } = 1.0;
 
     /// <summary>
+    /// Interior features defined for this template, keyed by cell position (template-local coordinates).
+    /// </summary>
+    public IReadOnlyDictionary<Cell, InteriorFeature> InteriorFeatures { get; init; } = new Dictionary<Cell, InteriorFeature>();
+
+    /// <summary>
     /// Gets the bounding box width of this template.
     /// </summary>
     public int Width => Cells.Count > 0 ? Cells.Max(c => c.X) - Cells.Min(c => c.X) + 1 : 0;

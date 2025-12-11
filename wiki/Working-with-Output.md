@@ -328,6 +328,202 @@ foreach (var hallway in layout.Hallways)
 }
 ```
 
+## Interior Features
+
+Interior features are obstacles and decorative elements defined within room templates, such as pillars, walls, hazards, and decorative items.
+
+### Accessing Interior Features
+
+**For a specific room:**
+
+```csharp
+var room = layout.Rooms[0];
+
+// Get all interior features in this room (world coordinates)
+foreach (var (worldCell, feature) in room.GetInteriorFeatures())
+{
+    Console.WriteLine($"Feature {feature} at ({worldCell.X}, {worldCell.Y})");
+    
+    // Render based on feature type
+    switch (feature)
+    {
+        case InteriorFeature.Pillar:
+            RenderPillar(worldCell.X, worldCell.Y);
+            break;
+        case InteriorFeature.Wall:
+            RenderInteriorWall(worldCell.X, worldCell.Y);
+            break;
+        case InteriorFeature.Hazard:
+            RenderHazard(worldCell.X, worldCell.Y);
+            break;
+        case InteriorFeature.Decorative:
+            RenderDecorative(worldCell.X, worldCell.Y);
+            break;
+    }
+}
+```
+
+**For all rooms:**
+
+```csharp
+// Get all interior features across the entire floor
+foreach (var (worldCell, feature) in layout.InteriorFeatures)
+{
+    RenderFeature(worldCell.X, worldCell.Y, feature);
+}
+```
+
+### Feature Types
+
+The `InteriorFeature` enum provides four types:
+
+- **`Pillar`** - Obstacles that block movement but not line of sight
+- **`Wall`** - Interior walls that create sub-areas within rooms
+- **`Hazard`** - Special cells that might contain traps, lava, spikes, etc.
+- **`Decorative`** - Visual markers for special areas (altars, fountains, etc.)
+
+### Rendering Interior Features
+
+When rendering a dungeon, include interior features:
+
+```csharp
+var layout = generator.Generate(config);
+var (min, max) = layout.GetBounds();
+
+// Render rooms first
+foreach (var room in layout.Rooms)
+{
+    foreach (var cell in room.GetWorldCells())
+    {
+        int screenX = cell.X - min.X;
+        int screenY = cell.Y - min.Y;
+        RenderTile(screenX, screenY, GetTileForRoomType(room.RoomType));
+    }
+}
+
+// Then render interior features
+foreach (var (worldCell, feature) in layout.InteriorFeatures)
+{
+    int screenX = worldCell.X - min.X;
+    int screenY = worldCell.Y - min.Y;
+    
+    switch (feature)
+    {
+        case InteriorFeature.Pillar:
+            RenderTile(screenX, screenY, TileType.Pillar);
+            break;
+        case InteriorFeature.Wall:
+            RenderTile(screenX, screenY, TileType.InteriorWall);
+            break;
+        case InteriorFeature.Hazard:
+            RenderTile(screenX, screenY, TileType.Hazard);
+            break;
+        case InteriorFeature.Decorative:
+            RenderTile(screenX, screenY, TileType.Decorative);
+            break;
+    }
+}
+```
+
+### Game Integration
+
+Interior features enable various gameplay mechanics:
+
+**Cover Mechanics (Pillars):**
+```csharp
+foreach (var (cell, feature) in room.GetInteriorFeatures())
+{
+    if (feature == InteriorFeature.Pillar)
+    {
+        // Pillars block movement but not line of sight
+        if (IsPlayerAt(cell))
+        {
+            ApplyCoverBonus();  // Player gets cover bonus
+        }
+    }
+}
+```
+
+**Tactical Positioning (Walls):**
+```csharp
+foreach (var (cell, feature) in room.GetInteriorFeatures())
+{
+    if (feature == InteriorFeature.Wall)
+    {
+        // Walls create chokepoints and sub-areas
+        BlockMovement(cell);
+        BlockLineOfSight(cell);
+    }
+}
+```
+
+**Environmental Hazards:**
+```csharp
+foreach (var (cell, feature) in room.GetInteriorFeatures())
+{
+    if (feature == InteriorFeature.Hazard)
+    {
+        // Hazards deal damage or apply effects
+        if (IsPlayerAt(cell))
+        {
+            ApplyHazardDamage(cell);
+        }
+    }
+}
+```
+
+**Thematic Elements (Decorative):**
+```csharp
+foreach (var (cell, feature) in room.GetInteriorFeatures())
+{
+    if (feature == InteriorFeature.Decorative)
+    {
+        // Decorative features add visual interest
+        RenderSpecialEffect(cell, DecorativeType.Altar);
+    }
+}
+```
+
+### Finding Features by Type
+
+```csharp
+// Find all hazards in the dungeon
+var hazards = layout.InteriorFeatures
+    .Where(f => f.Feature == InteriorFeature.Hazard)
+    .ToList();
+
+// Find all decorative features in a specific room
+var room = layout.Rooms[0];
+var decorativeFeatures = room.GetInteriorFeatures()
+    .Where(f => f.Feature == InteriorFeature.Decorative)
+    .ToList();
+```
+
+### Coordinate Systems
+
+**Important:** Interior features use different coordinate systems:
+
+- **In templates**: Features are defined in **template-local coordinates** (relative to anchor)
+- **In placed rooms**: Features are returned in **world coordinates** (absolute position)
+
+```csharp
+// Template defines feature at template-local (2, 2)
+var template = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .AddInteriorFeature(2, 2, InteriorFeature.Pillar)
+    .Build();
+
+// Room is placed at world position (10, 20)
+var room = new PlacedRoom<RoomType>
+{
+    Position = new Cell(10, 20),
+    Template = template
+};
+
+// Feature appears at world position (12, 22)
+var features = room.GetInteriorFeatures();
+// Returns: (worldCell: (12, 22), feature: Pillar)
+```
+
 ## Secret Passages
 
 Secret passages are hidden connections between rooms that are not part of the main dungeon graph.

@@ -2,19 +2,5 @@
   "version": "1.0",
   "lastUpdated": "2025-12-11T20:00:00Z",
   "nextFeatureId": 2,
-  "features": [
-    {
-      "id": "FEATURE-001",
-      "title": "Alternative Graph Generation Algorithms",
-      "status": "complete",
-      "priority": "high",
-      "complexity": "complex",
-      "created": "2025-01-27T00:00:00Z",
-      "updated": "2025-12-11T20:00:00Z",
-      "featureFile": ".bots/features/FEATURE-001-alternative-graph-algorithms.md",
-      "testFile": "tests/ShepherdProceduralDungeons.Tests/AlternativeGraphGenerationAlgorithmsTests.cs",
-      "dependencies": [],
-      "notes": []
-    }
-  ]
+  "features": []
 }

@@ -174,6 +174,7 @@ public required int BossRoomId { get; init; }
 public IReadOnlyDictionary<int, string>? ZoneAssignments { get; init; }  // Node ID -> Zone ID
 public IReadOnlyList<PlacedRoom<TRoomType>> TransitionRooms { get; init; }  // Rooms connecting zones
 public required IReadOnlyList<SecretPassage> SecretPassages { get; init; }  // Secret passages
+public IEnumerable<(Cell WorldCell, InteriorFeature Feature)> InteriorFeatures { get; }  // All interior features
 ```
 
 ### Methods
@@ -185,6 +186,8 @@ public IEnumerable<Cell> GetAllRoomCells()
 public IEnumerable<Cell> GetAllHallwayCells()
 public (Cell Min, Cell Max) GetBounds()
 ```
+
+**InteriorFeatures**: Gets all interior features from all rooms in world coordinates. Returns tuples of (world cell, feature type).
 
 ## RoomTemplate<TRoomType>
 
@@ -198,11 +201,14 @@ public required IReadOnlySet<TRoomType> ValidRoomTypes { get; init; }
 public required IReadOnlySet<Cell> Cells { get; init; }
 public required IReadOnlyDictionary<Cell, Edge> DoorEdges { get; init; }
 public double Weight { get; init; }  // Default: 1.0
+public IReadOnlyDictionary<Cell, InteriorFeature> InteriorFeatures { get; init; }  // Default: empty
 public int Width { get; }
 public int Height { get; }
 ```
 
 **Weight**: Selection weight for this template. Higher weights increase selection probability. Default is 1.0 (uniform distribution when all templates have default weight). Must be greater than 0.
+
+**InteriorFeatures**: Interior obstacles and features defined for this template, keyed by cell position (template-local coordinates). Default is an empty dictionary. Features must be placed in interior cells (not on exterior edges).
 
 ### Methods
 
@@ -238,10 +244,13 @@ public RoomTemplateBuilder<TRoomType> WithDoorEdges(int x, int y, Edge edges)
 public RoomTemplateBuilder<TRoomType> WithDoorsOnAllExteriorEdges()
 public RoomTemplateBuilder<TRoomType> WithDoorsOnSides(Edge sides)
 public RoomTemplateBuilder<TRoomType> WithWeight(double weight)
+public RoomTemplateBuilder<TRoomType> AddInteriorFeature(int x, int y, InteriorFeature feature)
 public RoomTemplate<TRoomType> Build()
 ```
 
 **WithWeight**: Sets the selection weight for this template. Weight must be greater than 0. Default is 1.0. Higher weights increase selection probability.
+
+**AddInteriorFeature**: Adds an interior feature at the specified cell position (template-local coordinates). The feature must be within the template's cell bounds and cannot be placed on exterior edges. Throws `InvalidConfigurationException` if placement is invalid.
 
 ## PlacedRoom<TRoomType>
 
@@ -261,7 +270,10 @@ public required Cell Position { get; init; }  // Anchor position
 ```csharp
 public IEnumerable<Cell> GetWorldCells()
 public IEnumerable<(Cell LocalCell, Cell WorldCell, Edge Edge)> GetExteriorEdgesWorld()
+public IEnumerable<(Cell WorldCell, InteriorFeature Feature)> GetInteriorFeatures()
 ```
+
+**GetInteriorFeatures**: Gets all interior features in world coordinates. Returns tuples of (world cell, feature type).
 
 ## Constraints
 
@@ -675,6 +687,30 @@ public enum Edge
 ```csharp
 public static Edge Opposite(this Edge edge)
 ```
+
+## InteriorFeature
+
+Types of interior features that can be placed within room templates.
+
+### Values
+
+```csharp
+public enum InteriorFeature
+{
+    Pillar,      // Obstacle that blocks movement but not line of sight
+    Wall,        // Interior wall that creates sub-areas within rooms
+    Hazard,      // Special cells that might contain traps, lava, spikes, etc.
+    Decorative   // Visual markers for special areas (altars, fountains, etc.)
+}
+```
+
+**Pillar**: Obstacles that block movement but not line of sight. Useful for cover mechanics in combat rooms.
+
+**Wall**: Interior walls that create sub-areas within rooms. Useful for tactical positioning and creating chokepoints.
+
+**Hazard**: Special cells that might contain traps, lava, spikes, etc. Useful for environmental hazards and danger zones.
+
+**Decorative**: Visual markers for special areas (altars, fountains, etc.). Useful for thematic variety and visual interest.
 
 ## GraphAlgorithm
 

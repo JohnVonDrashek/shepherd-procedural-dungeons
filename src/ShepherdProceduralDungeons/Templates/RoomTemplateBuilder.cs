@@ -13,6 +13,7 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     private HashSet<Cell> _cells = new();
     private Dictionary<Cell, Edge> _doorEdges = new();
     private double _weight = 1.0;
+    private Dictionary<Cell, InteriorFeature> _interiorFeatures = new();
 
     /// <summary>
     /// Sets the template ID.
@@ -198,6 +199,20 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     }
 
     /// <summary>
+    /// Adds an interior feature at the specified cell position.
+    /// </summary>
+    /// <param name="x">X coordinate of the cell (template-local).</param>
+    /// <param name="y">Y coordinate of the cell (template-local).</param>
+    /// <param name="feature">The interior feature to place.</param>
+    /// <returns>This builder for method chaining.</returns>
+    public RoomTemplateBuilder<TRoomType> AddInteriorFeature(int x, int y, InteriorFeature feature)
+    {
+        var cell = new Cell(x, y);
+        _interiorFeatures[cell] = feature;
+        return this;
+    }
+
+    /// <summary>
     /// Allows doors only on specific sides of the bounding box.
     /// </summary>
     /// <param name="sides">Which sides (North, South, East, West) to allow doors on.</param>
@@ -279,13 +294,34 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
                 throw new InvalidConfigurationException($"Template '{_id}' has door on West edge of cell {cell}, but that edge is interior");
         }
 
+        // Validate interior features
+        if (_cells.Count > 0)
+        {
+            int minX = _cells.Min(c => c.X);
+            int maxX = _cells.Max(c => c.X);
+            int minY = _cells.Min(c => c.Y);
+            int maxY = _cells.Max(c => c.Y);
+
+            foreach (var (cell, feature) in _interiorFeatures)
+            {
+                // Check if feature is within template bounds
+                if (!_cells.Contains(cell))
+                    throw new InvalidConfigurationException($"Template '{_id}' has interior feature at cell {cell} which is not part of the template");
+
+                // Check if feature is on an exterior edge (not allowed)
+                if (cell.X == minX || cell.X == maxX || cell.Y == minY || cell.Y == maxY)
+                    throw new InvalidConfigurationException($"Template '{_id}' has interior feature at cell {cell} which is on an exterior edge. Interior features must be placed in interior cells only.");
+            }
+        }
+
         return new RoomTemplate<TRoomType>
         {
             Id = _id,
             ValidRoomTypes = _validTypes,
             Cells = _cells,
             DoorEdges = _doorEdges,
-            Weight = _weight
+            Weight = _weight,
+            InteriorFeatures = _interiorFeatures
         };
     }
 }
