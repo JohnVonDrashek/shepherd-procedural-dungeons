@@ -2786,11 +2786,271 @@ var caLayout = generator.Generate(caConfig);
 - Central gathering areas are important
 - Spoke-based exploration fits your design
 
+## ASCII Map Visualization Example
+
+Example using the ASCII visualization system to generate text-based dungeon maps:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Templates;
+using ShepherdProceduralDungeons.Visualization;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+// Create templates
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 10,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    Templates = templates,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 2)
+    }
+};
+
+// Generate dungeon
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Render ASCII map
+var renderer = new AsciiMapRenderer<RoomType>();
+string asciiMap = renderer.Render(layout);
+
+Console.WriteLine(asciiMap);
+```
+
+**Example Output:**
+```
+SSS
+SSS
+SSS
+  .
+  +
+CCCC
+CCCC
+CCCC
+CCCC
+  .
+  +
+TT
+TT
+  .
+  +
+$$$$
+$$$$
+$$$$
+  .
+  +
+BBBBBB
+BBBBBB
+BBBBBB
+BBBBBB
+BBBBBB
+BBBBBB
+
+Legend:
+  B = Boss
+  C = Combat
+  S = Spawn
+  $ = Shop
+  T = Treasure
+  . = Hallway
+  + = Door
+```
+
+### Custom Rendering Options
+
+```csharp
+var options = new AsciiRenderOptions
+{
+    Style = AsciiRenderStyle.Minimal,
+    HighlightCriticalPath = true,
+    ShowHallways = true,
+    ShowDoors = true,
+    ShowInteriorFeatures = true,
+    ShowSecretPassages = true,
+    IncludeLegend = true,
+    CustomRoomTypeSymbols = new Dictionary<object, char>
+    {
+        { RoomType.Spawn, 'P' },      // Use 'P' for spawn
+        { RoomType.Boss, 'X' },       // Use 'X' for boss
+        { RoomType.Treasure, 'G' }    // Use 'G' for treasure (gold)
+    }
+};
+
+string customMap = renderer.Render(layout, options);
+Console.WriteLine(customMap);
+```
+
+### Viewport for Large Dungeons
+
+```csharp
+var (min, max) = layout.GetBounds();
+
+// Render only a portion of the dungeon
+var viewportOptions = new AsciiRenderOptions
+{
+    Viewport = (min, new Cell(min.X + 20, min.Y + 15))  // 20x15 viewport
+};
+
+string viewportMap = renderer.Render(layout, viewportOptions);
+```
+
+### Multi-Floor Visualization
+
+```csharp
+var multiFloorGenerator = new MultiFloorGenerator<RoomType>();
+var multiFloorLayout = multiFloorGenerator.Generate(multiFloorConfig);
+
+var renderer = new AsciiMapRenderer<RoomType>();
+string multiFloorMap = renderer.Render(multiFloorLayout);
+
+Console.WriteLine(multiFloorMap);
+```
+
+**Example Output:**
+```
+=== Floor 0 ===
+[ASCII map of floor 0]
+
+=== Floor 1 ===
+[ASCII map of floor 1]
+
+=== Floor 2 ===
+[ASCII map of floor 2]
+```
+
+### Rendering to File
+
+```csharp
+using (var writer = new StreamWriter("dungeon-map.txt"))
+{
+    renderer.Render(layout, writer);
+}
+```
+
+### Rendering with Interior Features
+
+```csharp
+// Create template with interior features
+var combatTemplate = RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+    .WithId("combat-with-features")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .AddInteriorFeature(1, 1, InteriorFeature.Pillar)
+    .AddInteriorFeature(3, 1, InteriorFeature.Pillar)
+    .AddInteriorFeature(2, 3, InteriorFeature.Hazard)
+    .Build();
+
+// Generate and render
+var layout = generator.Generate(config);
+var options = new AsciiRenderOptions
+{
+    ShowInteriorFeatures = true
+};
+
+string mapWithFeatures = renderer.Render(layout, options);
+```
+
+**Example Output:**
+```
+CCCCC
+C○C○C
+CCCCC
+CC!CC
+CCCCC
+
+Legend:
+  C = Combat
+  ○ = Pillar
+  ! = Hazard
+  . = Hallway
+  + = Door
+```
+
+### Rendering Secret Passages
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 2,
+        MaxSpatialDistance = 5
+    }
+};
+
+var layout = generator.Generate(config);
+var options = new AsciiRenderOptions
+{
+    ShowSecretPassages = true
+};
+
+string mapWithSecrets = renderer.Render(layout, options);
+```
+
+Secret passages are rendered with '~' symbols to distinguish them from regular connections.
+
+### Performance Optimization for Large Dungeons
+
+```csharp
+var options = new AsciiRenderOptions
+{
+    MaxSize = (80, 24),  // Limit to terminal size
+    Viewport = (new Cell(0, 0), new Cell(50, 30))  // Render specific region
+};
+
+string optimizedMap = renderer.Render(layout, options);
+```
+
 ## Next Steps
 
 - **[Getting Started](Getting-Started)** - Learn the basics
 - **[Room Templates](Room-Templates)** - Create custom shapes
 - **[Constraints](Constraints)** - Control room placement
 - **[Configuration](Configuration)** - Learn about configuration serialization
-- **[Working with Output](Working-with-Output)** - Use generated layouts, including secret passages
+- **[Working with Output](Working-with-Output)** - Use generated layouts, including secret passages and visualization
 

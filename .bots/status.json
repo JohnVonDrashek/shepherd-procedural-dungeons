@@ -1,6 +1,20 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-11T20:00:00Z",
-  "nextFeatureId": 2,
-  "features": []
+  "lastUpdated": "2025-12-11T22:00:00Z",
+  "nextFeatureId": 3,
+  "features": [
+    {
+      "id": "FEATURE-002",
+      "title": "ASCII Art Map Visualization System",
+      "status": "complete",
+      "priority": "high",
+      "complexity": "complex",
+      "created": "2025-12-11T20:30:00Z",
+      "updated": "2025-12-11T22:00:00Z",
+      "featureFile": ".bots/features/FEATURE-002-ascii-map-visualization.md",
+      "testFile": "tests/ShepherdProceduralDungeons.Tests/AsciiMapVisualizationTests.cs",
+      "dependencies": [],
+      "notes": []
+    }
+  ]
 }

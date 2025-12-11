@@ -673,9 +673,96 @@ Console.WriteLine($"Total rooms: {stats.TotalRooms}");
 Console.WriteLine($"Dead ends: {stats.DeadEnds}");
 ```
 
+## ASCII Map Visualization
+
+The library includes a built-in ASCII visualization system for generating text-based dungeon maps. This is perfect for debugging, development, documentation, and even in-game minimaps for text-based roguelikes.
+
+### Basic Usage
+
+```csharp
+using ShepherdProceduralDungeons.Visualization;
+
+var renderer = new AsciiMapRenderer<RoomType>();
+string asciiMap = renderer.Render(layout);
+Console.WriteLine(asciiMap);
+```
+
+### Rendering Options
+
+```csharp
+var options = new AsciiRenderOptions
+{
+    Style = AsciiRenderStyle.Detailed,
+    HighlightCriticalPath = true,
+    ShowHallways = true,
+    ShowDoors = true,
+    ShowInteriorFeatures = true,
+    ShowSecretPassages = true,
+    IncludeLegend = true,
+    CustomRoomTypeSymbols = new Dictionary<object, char>
+    {
+        { RoomType.Spawn, 'S' },
+        { RoomType.Boss, 'B' }
+    }
+};
+
+string map = renderer.Render(layout, options);
+```
+
+### Multi-Floor Visualization
+
+```csharp
+var multiFloorRenderer = new AsciiMapRenderer<RoomType>();
+string multiFloorMap = renderer.Render(multiFloorLayout);
+```
+
+Each floor is rendered separately with clear separators.
+
+### Rendering to File or Stream
+
+```csharp
+// To file
+using (var writer = new StreamWriter("dungeon-map.txt"))
+{
+    renderer.Render(layout, writer);
+}
+
+// To StringBuilder
+var builder = new StringBuilder();
+renderer.Render(layout, builder);
+string map = builder.ToString();
+```
+
+### Viewport for Large Dungeons
+
+For large dungeons, use a viewport to render only a specific region:
+
+```csharp
+var (min, max) = layout.GetBounds();
+var viewportOptions = new AsciiRenderOptions
+{
+    Viewport = (min, new Cell(min.X + 30, min.Y + 20))
+};
+
+string viewportMap = renderer.Render(layout, viewportOptions);
+```
+
+### Symbol Meanings
+
+The renderer uses standard symbols:
+- **Room types**: Letters based on room type name (S=Spawn, B=Boss, C=Combat, $=Shop, T=Treasure)
+- **Hallways**: `.` (period)
+- **Doors**: `+` (plus)
+- **Secret passages**: `~` (tilde)
+- **Interior features**: `○` (pillar), `█` (wall), `!` (hazard), `◊` (decorative)
+- **Critical path**: Uppercase letters (when highlighting enabled)
+
+See **[Examples](Examples#ascii-map-visualization-example)** for complete visualization examples.
+
 ## Next Steps
 
-- **[Examples](Examples)** - See complete usage examples
+- **[Examples](Examples)** - See complete usage examples, including visualization
 - **[Room Templates](Room-Templates)** - Understand template structure
 - **[Configuration](Configuration)** - Control generation output
+- **[API Reference](API-Reference#asciimaprenderertroomtype)** - Full visualization API documentation
 

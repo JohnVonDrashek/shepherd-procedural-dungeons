@@ -1172,6 +1172,146 @@ Loads a `FloorConfig` from a JSON file.
 - `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
 - `FileNotFoundException` - Thrown when the file doesn't exist
 
+## AsciiMapRenderer<TRoomType>
+
+Generates ASCII art visualizations of dungeon layouts.
+
+### Constructor
+
+```csharp
+public AsciiMapRenderer()
+```
+
+Creates a new ASCII map renderer.
+
+### Methods
+
+#### Render (FloorLayout to string)
+
+```csharp
+public string Render(FloorLayout<TRoomType> layout, AsciiRenderOptions? options = null)
+```
+
+Renders a single-floor layout to a string.
+
+**Parameters:**
+- `layout` - The floor layout to render
+- `options` - Optional rendering configuration (default: null, uses default options)
+
+**Returns:** `string` - ASCII art representation of the dungeon
+
+#### Render (FloorLayout to TextWriter)
+
+```csharp
+public void Render(FloorLayout<TRoomType> layout, TextWriter writer, AsciiRenderOptions? options = null)
+```
+
+Renders a single-floor layout to a TextWriter.
+
+**Parameters:**
+- `layout` - The floor layout to render
+- `writer` - TextWriter to write output to
+- `options` - Optional rendering configuration
+
+#### Render (FloorLayout to StringBuilder)
+
+```csharp
+public void Render(FloorLayout<TRoomType> layout, StringBuilder builder, AsciiRenderOptions? options = null)
+```
+
+Renders a single-floor layout to a StringBuilder.
+
+**Parameters:**
+- `layout` - The floor layout to render
+- `builder` - StringBuilder to append output to
+- `options` - Optional rendering configuration
+
+#### Render (MultiFloorLayout to string)
+
+```csharp
+public string Render(MultiFloorLayout<TRoomType> layout, AsciiRenderOptions? options = null)
+```
+
+Renders a multi-floor layout to a string. Each floor is rendered separately with clear separators.
+
+**Parameters:**
+- `layout` - The multi-floor layout to render
+- `options` - Optional rendering configuration
+
+**Returns:** `string` - ASCII art representation of all floors
+
+## AsciiRenderOptions
+
+Configuration options for ASCII rendering.
+
+### Properties
+
+```csharp
+public AsciiRenderStyle Style { get; init; }  // Default: AsciiRenderStyle.Detailed
+public IReadOnlyDictionary<object, char>? CustomRoomTypeSymbols { get; init; }  // Default: null
+public bool ShowRoomIds { get; init; }  // Default: false
+public bool HighlightCriticalPath { get; init; }  // Default: true
+public bool ShowHallways { get; init; }  // Default: true
+public bool ShowDoors { get; init; }  // Default: true
+public bool ShowInteriorFeatures { get; init; }  // Default: true
+public bool ShowSecretPassages { get; init; }  // Default: true
+public bool ShowZoneBoundaries { get; init; }  // Default: false
+public (Cell Min, Cell Max)? Viewport { get; init; }  // Default: null (render entire dungeon)
+public int Scale { get; init; }  // Default: 1
+public bool IncludeLegend { get; init; }  // Default: true
+public (int MaxWidth, int MaxHeight)? MaxSize { get; init; }  // Default: (120, 40)
+```
+
+**Style**: Rendering style preset (Minimal, Detailed, Artistic, Compact).
+
+**CustomRoomTypeSymbols**: Custom symbol mappings for room types. Overrides style defaults. Key is the room type enum value, value is the character to use.
+
+**ShowRoomIds**: Whether to show room IDs in the legend (not overlaid on the map).
+
+**HighlightCriticalPath**: Whether to highlight critical path rooms (shown as uppercase symbols).
+
+**ShowHallways**: Whether to render hallway cells (shown as '.').
+
+**ShowDoors**: Whether to render doors (shown as '+').
+
+**ShowInteriorFeatures**: Whether to render interior features (pillars, walls, hazards, decorative).
+
+**ShowSecretPassages**: Whether to render secret passages (shown as '~').
+
+**ShowZoneBoundaries**: Whether to show zone boundaries (if zones are configured).
+
+**Viewport**: Viewport for large dungeons. Null = render entire dungeon. Specifies a rectangular region to render.
+
+**Scale**: Scale factor for rendering (1 = normal, 2 = double size, etc.).
+
+**IncludeLegend**: Whether to include a legend at the bottom showing symbol meanings.
+
+**MaxSize**: Maximum width/height before auto-scaling or viewport is required. Used for performance optimization.
+
+## AsciiRenderStyle
+
+Rendering style presets for ASCII map visualization.
+
+### Values
+
+```csharp
+public enum AsciiRenderStyle
+{
+    Minimal,    // Minimal style - just rooms and connections
+    Detailed,   // Detailed style - rooms, hallways, doors, features
+    Artistic,   // Artistic style - uses box-drawing characters for walls
+    Compact     // Compact style - optimized for small terminals
+}
+```
+
+**Minimal**: Basic visualization with just rooms and connections.
+
+**Detailed**: Full visualization including all features (default).
+
+**Artistic**: Enhanced visualization with box-drawing characters (future enhancement).
+
+**Compact**: Optimized for small terminal windows.
+
 ## Namespaces
 
 - `ShepherdProceduralDungeons` - Main entry point
@@ -1183,6 +1323,7 @@ Loads a `FloorConfig` from a JSON file.
 - `ShepherdProceduralDungeons.Layout` - Output layout classes
 - `ShepherdProceduralDungeons.Serialization` - Serialization support
 - `ShepherdProceduralDungeons.Templates` - Template system
+- `ShepherdProceduralDungeons.Visualization` - ASCII visualization system
 
 ## See Also
 

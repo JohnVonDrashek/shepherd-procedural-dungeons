@@ -27,6 +27,7 @@ All generation is **deterministic** - same seed + config = identical output.
 - **[Configuration](Configuration)** - Complete guide to `FloorConfig` and `MultiFloorConfig`
 - **[Hallway Modes](Hallway-Modes)** - Understanding hallway generation options
 - **[Working with Output](Working-with-Output)** - Using the generated `FloorLayout` and `MultiFloorLayout`
+- **[Visualization](Examples#ascii-map-visualization-example)** - Generate ASCII art maps for debugging and display
 - **[Multi-Floor Dungeons](Advanced-Topics#multi-floor-dungeons)** - Generate multi-level dungeons with stairs and teleporters
 
 ### Examples & Help
@@ -106,7 +107,7 @@ foreach (var room in layout.Rooms)
 
 ## What This Library Does NOT Do
 
-- ❌ Rendering (your responsibility)
+- ❌ Graphics rendering (though ASCII visualization is provided)
 - ❌ Room interior content (enemies, obstacles, tiles)
 - ❌ Physics or collision
 
