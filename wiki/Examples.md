@@ -133,11 +133,13 @@ var constraints = new List<IConstraint<RoomType>>
     new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
     new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
     
     // Treasure constraints
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
     new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
-    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 3)
+    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 3),
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Treasure, RoomType.Boss)
 };
 
 // Config
@@ -168,6 +170,127 @@ Console.WriteLine($"Generated {layout.Rooms.Count} rooms");
 Console.WriteLine($"Critical path: {string.Join(" -> ", layout.CriticalPath)}");
 Console.WriteLine($"Treasure rooms: {layout.Rooms.Count(r => r.RoomType == RoomType.Treasure)}");
 ```
+
+## Adjacency Constraints
+
+Example using adjacency constraints to create spatial relationships between room types:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure, Rest
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("rest")
+        .ForRoomTypes(RoomType.Rest)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // Shop must be adjacent to Combat rooms (shops near danger)
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat),
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 4),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    
+    // Treasure must be adjacent to Boss OR Combat (reward near challenge)
+    new MustBeAdjacentToConstraint<RoomType>(
+        RoomType.Treasure, 
+        RoomType.Boss, 
+        RoomType.Combat
+    ),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2),
+    
+    // Rest rooms must be adjacent to Combat (safe havens after fights)
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Rest, RoomType.Combat),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Rest, 2)
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 2),
+        (RoomType.Rest, 2)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Verify adjacency constraints are satisfied
+foreach (var shop in layout.Rooms.Where(r => r.RoomType == RoomType.Shop))
+{
+    // Find adjacent rooms in the graph
+    var shopNode = layout.Rooms.First(r => r.NodeId == shop.NodeId);
+    var adjacentRooms = layout.Rooms.Where(r => 
+        layout.CriticalPath.Contains(r.NodeId) && 
+        Math.Abs(layout.CriticalPath.IndexOf(r.NodeId) - 
+                 layout.CriticalPath.IndexOf(shop.NodeId)) == 1
+    );
+    
+    Console.WriteLine($"Shop at node {shop.NodeId} is adjacent to: " +
+        string.Join(", ", adjacentRooms.Select(r => r.RoomType)));
+}
+```
+
+This example demonstrates:
+- **Shop adjacent to Combat**: Shops are placed near combat areas
+- **Treasure adjacent to Boss or Combat**: Rewards are near challenging content
+- **Rest adjacent to Combat**: Safe rooms are accessible after fights
 
 ## Linear Dungeon
 

@@ -122,6 +122,51 @@ new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1)
 new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2)
 ```
 
+### MustBeAdjacentToConstraint
+
+Room must be adjacent to at least one of the specified room types in the graph topology.
+
+```csharp
+new MustBeAdjacentToConstraint<RoomType>(
+    RoomType.Shop, 
+    RoomType.Combat
+)
+
+// Multiple adjacent types (OR logic)
+new MustBeAdjacentToConstraint<RoomType>(
+    RoomType.Treasure,
+    RoomType.Boss,
+    RoomType.MiniBoss
+)
+```
+
+**Use case:** Create spatial relationships between room types, such as requiring shops to be near combat rooms, or treasure rooms to be adjacent to boss rooms.
+
+**Important:** This constraint operates on the **graph structure** (which rooms connect to which), not the spatial layout. It ensures that when room types are assigned, the target room type is only placed on nodes that have at least one neighbor with the required adjacent room type.
+
+**Example:**
+```csharp
+// Shop must be adjacent to at least one Combat room
+new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat)
+
+// Treasure room must be adjacent to either Boss OR MiniBoss
+new MustBeAdjacentToConstraint<RoomType>(
+    RoomType.Treasure, 
+    RoomType.Boss, 
+    RoomType.MiniBoss
+)
+
+// Rest room must be adjacent to Combat rooms
+new MustBeAdjacentToConstraint<RoomType>(RoomType.Rest, RoomType.Combat)
+```
+
+**Behavior:**
+- Checks all neighbors of the candidate node
+- Returns `true` if at least one neighbor has been assigned one of the required adjacent room types
+- Works correctly with partially assigned graphs (only checks already-assigned neighbors)
+- Returns `false` if the node has no connections
+- If target room type is in the required adjacent types list, nodes adjacent to already-placed target rooms will be valid
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -169,11 +214,13 @@ var constraints = new List<IConstraint<RoomType>>
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
     new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure),
     new MaxPerFloorConstraint<RoomType>(RoomType.Treasure, 2),
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Treasure, RoomType.Boss),
     
     // Shop constraints
     new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 3),
     new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
-    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1)
+    new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+    new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat)
 };
 ```
 
@@ -214,10 +261,11 @@ Treasure is optional, hidden in dead ends, limited quantity.
 ```csharp
 new MaxDistanceFromStartConstraint<RoomType>(RoomType.Shop, 3),
 new NotOnCriticalPathConstraint<RoomType>(RoomType.Shop),
-new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1)
+new MaxPerFloorConstraint<RoomType>(RoomType.Shop, 1),
+new MustBeAdjacentToConstraint<RoomType>(RoomType.Shop, RoomType.Combat)
 ```
 
-Shop is accessible early, optional, one per floor.
+Shop is accessible early, optional, one per floor, adjacent to combat rooms.
 
 ### Secret Room Pattern
 

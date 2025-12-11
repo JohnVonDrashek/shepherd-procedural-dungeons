@@ -252,6 +252,25 @@ public class MaxPerFloorConstraint<TRoomType> : IConstraint<TRoomType>
 }
 ```
 
+#### MustBeAdjacentToConstraint
+
+```csharp
+public class MustBeAdjacentToConstraint<TRoomType> : IConstraint<TRoomType>
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> RequiredAdjacentTypes { get; }
+    
+    // Single adjacent type
+    public MustBeAdjacentToConstraint(TRoomType targetRoomType, TRoomType requiredAdjacentType);
+    
+    // Multiple adjacent types (OR logic)
+    public MustBeAdjacentToConstraint(TRoomType targetRoomType, params TRoomType[] requiredAdjacentTypes);
+    
+    // Multiple adjacent types from collection
+    public MustBeAdjacentToConstraint(TRoomType targetRoomType, IEnumerable<TRoomType> requiredAdjacentTypes);
+}
+```
+
 #### CustomConstraint
 
 ```csharp
