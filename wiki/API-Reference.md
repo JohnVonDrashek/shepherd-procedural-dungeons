@@ -538,6 +538,45 @@ public class OnlyInZoneConstraint<TRoomType> : IConstraint<TRoomType>, IZoneAwar
 
 **Use case:** Restrict room types to specific zones (e.g., shops only in market zone).
 
+#### CompositeConstraint
+
+Composes multiple constraints using AND, OR, or NOT logic.
+
+```csharp
+public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public CompositionOperator Operator { get; }
+    public IReadOnlyList<IConstraint<TRoomType>> Constraints { get; }
+    
+    // Factory methods
+    public static CompositeConstraint<TRoomType> And(params IConstraint<TRoomType>[] constraints);
+    public static CompositeConstraint<TRoomType> Or(params IConstraint<TRoomType>[] constraints);
+    public static CompositeConstraint<TRoomType> Not(IConstraint<TRoomType> constraint);
+    
+    // Implementation
+    public bool IsValid(
+        RoomNode node, 
+        FloorGraph graph, 
+        IReadOnlyDictionary<int, TRoomType> currentAssignments);
+}
+```
+
+**Use case:** Express complex constraint logic with AND/OR/NOT operators.
+
+#### CompositionOperator
+
+Enumeration of composition operators.
+
+```csharp
+public enum CompositionOperator
+{
+    And,  // All constraints must pass
+    Or,   // At least one constraint must pass
+    Not   // The wrapped constraint must fail
+}
+```
+
 ## Hallway
 
 Generated hallway connecting rooms.

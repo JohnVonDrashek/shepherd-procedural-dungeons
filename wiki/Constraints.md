@@ -607,6 +607,83 @@ var config = new FloorConfig<RoomType>
 - Returns `true` if zones haven't been assigned yet (permissive during early assignment phases)
 - Works correctly with zone assignment system - automatically receives zone assignments during generation
 
+### CompositeConstraint
+
+Composes multiple constraints using AND, OR, or NOT logic. Enables complex constraint patterns that would otherwise require `CustomConstraint`.
+
+```csharp
+// AND: All constraints must pass
+CompositeConstraint<RoomType>.And(
+    constraint1,
+    constraint2,
+    constraint3
+)
+
+// OR: At least one constraint must pass
+CompositeConstraint<RoomType>.Or(
+    constraint1,
+    constraint2
+)
+
+// NOT: The wrapped constraint must fail
+CompositeConstraint<RoomType>.Not(constraint)
+```
+
+**Use case:** Express complex logic like "Shop OR Treasure in dead ends" or "NOT (on critical path AND near spawn)".
+
+**Example - OR Composition:**
+```csharp
+// Shop OR Treasure room in dead ends (either constraint passes)
+var shopOrTreasure = CompositeConstraint<RoomType>.Or(
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Shop),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
+);
+```
+
+**Example - AND Composition (explicit):**
+```csharp
+// Multiple constraints (existing behavior, now explicit)
+var complexBoss = CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Boss)
+);
+```
+
+**Example - NOT Composition:**
+```csharp
+// Secret room NOT near spawn (exclude certain conditions)
+var notNearSpawn = CompositeConstraint<RoomType>.Not(
+    new MaxDistanceFromStartConstraint<RoomType>(RoomType.Secret, 2)
+);
+```
+
+**Example - Nested Composition:**
+```csharp
+// Complex logic: far from start AND (dead end OR not on critical path)
+var complex = CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Special, 3),
+    CompositeConstraint<RoomType>.Or(
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Special),
+        new NotOnCriticalPathConstraint<RoomType>(RoomType.Special)
+    )
+);
+```
+
+**Behavior:**
+- **AND**: All constraints must pass (short-circuits on first failure)
+- **OR**: At least one constraint must pass (short-circuits on first success)
+- **NOT**: The wrapped constraint must fail
+- **Empty AND**: Always passes (no constraints = always valid)
+- **Empty OR**: Always fails (no constraints = never valid)
+- **OR with different target types**: Allowed (e.g., "Shop OR Treasure" - uses first constraint's target type)
+
+**Important Notes:**
+- For AND compositions, all constraints must target the same room type
+- For OR compositions, constraints can target different room types (enables "Shop OR Treasure" scenarios)
+- CompositeConstraint implements `IConstraint<TRoomType>`, so it works seamlessly with existing constraint system
+- Can be nested arbitrarily (AND containing OR, OR containing AND, NOT containing compositions, etc.)
+
 ### CustomConstraint
 
 Custom callback-based constraint for advanced logic.
@@ -623,7 +700,7 @@ new CustomConstraint<RoomType>(
 )
 ```
 
-**Use case:** Complex placement rules that built-in constraints can't express.
+**Use case:** Complex placement rules that built-in constraints can't express. Consider using `CompositeConstraint` first for AND/OR/NOT logic.
 
 **Example:**
 ```csharp
@@ -639,9 +716,22 @@ new CustomConstraint<RoomType>(
 )
 ```
 
+**Note:** Many scenarios that previously required `CustomConstraint` can now use `CompositeConstraint` instead. For example, the above could be written as:
+```csharp
+CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Secret, 3),
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret)
+)
+```
+
 ## Combining Constraints
 
-You can apply multiple constraints to the same room type. **All** constraints must be satisfied:
+You can apply multiple constraints to the same room type. By default, **all** constraints must be satisfied (implicit AND logic). You can also use `CompositeConstraint` to explicitly control how constraints are combined with AND/OR/NOT logic.
+
+### Implicit AND (Default Behavior)
+
+When you list multiple constraints for the same room type, they are combined with implicit AND logic - all must pass:
 
 ```csharp
 var constraints = new List<IConstraint<RoomType>>
@@ -682,6 +772,51 @@ var constraints = new List<IConstraint<RoomType>>
     new MustComeBeforeConstraint<RoomType>(RoomType.MiniBoss, RoomType.Boss)
 };
 ```
+
+### Explicit Composition with CompositeConstraint
+
+Use `CompositeConstraint` when you need OR or NOT logic, or want to explicitly express AND logic:
+
+```csharp
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints (explicit AND)
+    CompositeConstraint<RoomType>.And(
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Boss)
+    ),
+    
+    // Shop OR Treasure in dead ends (OR logic)
+    CompositeConstraint<RoomType>.Or(
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Shop),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
+    ),
+    
+    // Secret NOT near spawn (NOT logic)
+    CompositeConstraint<RoomType>.Not(
+        new MaxDistanceFromStartConstraint<RoomType>(RoomType.Secret, 2)
+    ),
+    
+    // Complex nested: far from start AND (dead end OR not on critical path)
+    CompositeConstraint<RoomType>.And(
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Special, 3),
+        CompositeConstraint<RoomType>.Or(
+            new MustBeDeadEndConstraint<RoomType>(RoomType.Special),
+            new NotOnCriticalPathConstraint<RoomType>(RoomType.Special)
+        )
+    )
+};
+```
+
+**When to use CompositeConstraint:**
+- **OR logic**: "Shop OR Treasure" - either constraint can pass
+- **NOT logic**: "NOT near spawn" - exclude certain conditions
+- **Nested logic**: Complex combinations like "A AND (B OR C)"
+- **Explicit AND**: When you want to make AND logic explicit (though implicit AND is usually sufficient)
+
+**When NOT to use CompositeConstraint:**
+- Simple AND logic: Just list multiple constraints (implicit AND is cleaner)
+- Single constraint: No need to wrap in CompositeConstraint
 
 ## Constraint Evaluation Order
 

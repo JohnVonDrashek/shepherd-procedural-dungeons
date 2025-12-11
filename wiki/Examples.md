@@ -536,6 +536,139 @@ This example demonstrates:
 - **Secret away from Boss**: Secret rooms are hidden at least 3 steps from boss rooms
 - **Multiple reference types**: Can specify multiple reference types (e.g., "within 2 steps of Combat OR Boss")
 
+## Constraint Composition (AND/OR/NOT)
+
+Example using `CompositeConstraint` to express complex constraint logic:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure, Secret, Special
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("secret")
+        .ForRoomTypes(RoomType.Secret)
+        .WithDoorsOnSides(Edge.All)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("special")
+        .ForRoomTypes(RoomType.Special)
+        .WithDoorsOnAllExteriorEdges()
+        .Build()
+};
+
+var constraints = new List<IConstraint<RoomType>>
+{
+    // Boss constraints
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+    
+    // OR: Shop OR Treasure in dead ends (either constraint passes)
+    CompositeConstraint<RoomType>.Or(
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Shop),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
+    ),
+    
+    // NOT: Secret NOT near spawn (exclude certain conditions)
+    CompositeConstraint<RoomType>.Not(
+        new MaxDistanceFromStartConstraint<RoomType>(RoomType.Secret, 2)
+    ),
+    new MustBeDeadEndConstraint<RoomType>(RoomType.Secret),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Secret, 1),
+    
+    // Nested: Special room - far from start AND (dead end OR not on critical path)
+    CompositeConstraint<RoomType>.And(
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Special, 3),
+        CompositeConstraint<RoomType>.Or(
+            new MustBeDeadEndConstraint<RoomType>(RoomType.Special),
+            new NotOnCriticalPathConstraint<RoomType>(RoomType.Special)
+        )
+    ),
+    new MaxPerFloorConstraint<RoomType>(RoomType.Special, 1)
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 1),
+        (RoomType.Secret, 1),
+        (RoomType.Special, 1)
+    },
+    Constraints = constraints,
+    Templates = templates,
+    BranchingFactor = 0.3f
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Verify composition constraints
+var shopRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Shop).ToList();
+var treasureRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Treasure).ToList();
+var secretRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Secret).ToList();
+var specialRooms = layout.Rooms.Where(r => r.RoomType == RoomType.Special).ToList();
+
+Console.WriteLine($"Shop rooms: {shopRooms.Count}");
+Console.WriteLine($"Treasure rooms: {treasureRooms.Count}");
+Console.WriteLine($"Secret rooms: {secretRooms.Count}");
+Console.WriteLine($"Special rooms: {specialRooms.Count}");
+
+// Shop OR Treasure constraint: At least one should be in a dead end
+// (Both could be, but at least one must be)
+```
+
+This example demonstrates:
+- **OR composition**: "Shop OR Treasure in dead ends" - either constraint can pass
+- **NOT composition**: "Secret NOT near spawn" - excludes rooms within 2 steps of spawn
+- **Nested composition**: "Special room - far from start AND (dead end OR not on critical path)" - complex logic
+- **Real-world scenarios**: Expressing game design requirements that need alternative placement strategies
+
 ## Critical Path Ordering Constraints
 
 Example using `MustComeBeforeConstraint` to enforce ordering on the critical path:
