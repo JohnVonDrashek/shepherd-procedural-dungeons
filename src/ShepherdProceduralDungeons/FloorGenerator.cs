@@ -174,6 +174,16 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         // 8. Place doors
         var doors = PlaceDoors(placedRooms, hallways, graph);
 
+        // 8.5. Generate secret passages (after hallways, before final output)
+        int secretPassageSeed = masterRng.Next();
+        var secretPassageRng = new Random(secretPassageSeed);
+        var secretPassages = GenerateSecretPassages(
+            config.SecretPassageConfig,
+            placedRooms,
+            graph,
+            occupiedCells,
+            secretPassageRng);
+
         // 9. Identify transition rooms (rooms connecting different zones)
         var transitionRooms = new List<PlacedRoom<TRoomType>>();
         if (zoneAssignments != null && zoneAssignments.Count > 0)
@@ -209,7 +219,8 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             SpawnRoomId = graph.StartNodeId,
             BossRoomId = graph.BossNodeId,
             ZoneAssignments = zoneAssignments,
-            TransitionRooms = transitionRooms
+            TransitionRooms = transitionRooms,
+            SecretPassages = secretPassages
         };
     }
 
@@ -354,6 +365,515 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
             Edge.West => cell.West,
             _ => throw new ArgumentException($"Invalid edge: {edge}")
         };
+    }
+
+    private IReadOnlyList<SecretPassage> GenerateSecretPassages(
+        SecretPassageConfig<TRoomType>? config,
+        IReadOnlyList<PlacedRoom<TRoomType>> rooms,
+        FloorGraph graph,
+        HashSet<Cell> occupiedCells,
+        Random rng)
+    {
+        var secretPassages = new List<SecretPassage>();
+
+        // If no config or count is 0, return empty list
+        if (config == null || config.Count <= 0)
+        {
+            return secretPassages;
+        }
+
+        // Build set of graph-connected room pairs
+        var graphConnectedPairs = new HashSet<(int, int)>();
+        foreach (var conn in graph.Connections)
+        {
+            var pair = (Math.Min(conn.NodeAId, conn.NodeBId), Math.Max(conn.NodeAId, conn.NodeBId));
+            graphConnectedPairs.Add(pair);
+        }
+
+        // Build set of critical path room IDs
+        var criticalPathSet = graph.CriticalPath.ToHashSet();
+
+        // Find all candidate room pairs
+        var candidates = new List<(PlacedRoom<TRoomType> RoomA, PlacedRoom<TRoomType> RoomB, int Distance)>();
+        
+        for (int i = 0; i < rooms.Count; i++)
+        {
+            for (int j = i + 1; j < rooms.Count; j++)
+            {
+                var roomA = rooms[i];
+                var roomB = rooms[j];
+
+                // Check room type constraints
+                if (config.AllowedRoomTypes.Count > 0)
+                {
+                    if (!config.AllowedRoomTypes.Contains(roomA.RoomType) ||
+                        !config.AllowedRoomTypes.Contains(roomB.RoomType))
+                    {
+                        continue;
+                    }
+                }
+
+                if (config.ForbiddenRoomTypes.Contains(roomA.RoomType) ||
+                    config.ForbiddenRoomTypes.Contains(roomB.RoomType))
+                {
+                    continue;
+                }
+
+                // Check critical path constraint
+                if (!config.AllowCriticalPathConnections)
+                {
+                    if (criticalPathSet.Contains(roomA.NodeId) || criticalPathSet.Contains(roomB.NodeId))
+                    {
+                        continue;
+                    }
+                }
+
+                // Check graph connection constraint
+                if (!config.AllowGraphConnectedRooms)
+                {
+                    var pair = (Math.Min(roomA.NodeId, roomB.NodeId), Math.Max(roomA.NodeId, roomB.NodeId));
+                    if (graphConnectedPairs.Contains(pair))
+                    {
+                        continue;
+                    }
+                }
+
+                // Calculate spatial distance (Manhattan distance between room centers)
+                var centerA = GetRoomCenter(roomA);
+                var centerB = GetRoomCenter(roomB);
+                int distance = Math.Abs(centerA.X - centerB.X) + Math.Abs(centerA.Y - centerB.Y);
+
+                if (distance <= config.MaxSpatialDistance)
+                {
+                    candidates.Add((roomA, roomB, distance));
+                }
+            }
+        }
+
+        // Sort by distance (prefer shorter distances)
+        candidates.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+
+        // Select up to Count secret passages
+        int selectedCount = Math.Min(config.Count, candidates.Count);
+        var selectedCandidates = new List<(PlacedRoom<TRoomType> RoomA, PlacedRoom<TRoomType> RoomB)>();
+        
+        // Shuffle candidates to add randomness, then take first N
+        var shuffledCandidates = candidates.OrderBy(_ => rng.Next()).Take(selectedCount).ToList();
+        
+        foreach (var candidate in shuffledCandidates)
+        {
+            selectedCandidates.Add((candidate.RoomA, candidate.RoomB));
+        }
+
+        // Generate secret passages for selected candidates
+        var hallwayGenerator = new HallwayGenerator<TRoomType>();
+        int secretPassageId = 0;
+
+        foreach (var (roomA, roomB) in selectedCandidates)
+        {
+            try
+            {
+                var secretPassage = CreateSecretPassage(
+                    roomA,
+                    roomB,
+                    secretPassageId++,
+                    occupiedCells,
+                    hallwayGenerator,
+                    rng);
+                
+                if (secretPassage != null)
+                {
+                    secretPassages.Add(secretPassage);
+                    
+                    // Mark hallway cells as occupied if hallway was created
+                    if (secretPassage.Hallway != null)
+                    {
+                        foreach (var segment in secretPassage.Hallway.Segments)
+                        {
+                            foreach (var cell in segment.GetCells())
+                            {
+                                occupiedCells.Add(cell);
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If we can't create a secret passage for this pair, skip it
+                // This can happen if rooms can't be connected spatially
+                continue;
+            }
+        }
+
+        return secretPassages;
+    }
+
+    private Cell GetRoomCenter(PlacedRoom<TRoomType> room)
+    {
+        var cells = room.GetWorldCells().ToList();
+        if (cells.Count == 0)
+            return room.Position;
+
+        int sumX = 0;
+        int sumY = 0;
+        foreach (var cell in cells)
+        {
+            sumX += cell.X;
+            sumY += cell.Y;
+        }
+
+        return new Cell(sumX / cells.Count, sumY / cells.Count);
+    }
+
+    private SecretPassage? CreateSecretPassage(
+        PlacedRoom<TRoomType> roomA,
+        PlacedRoom<TRoomType> roomB,
+        int secretPassageId,
+        HashSet<Cell> occupiedCells,
+        HallwayGenerator<TRoomType> hallwayGenerator,
+        Random rng)
+    {
+        // Get all possible door positions on each room
+        var doorsA = roomA.GetExteriorEdgesWorld()
+            .Where(e => roomA.Template.CanPlaceDoor(e.LocalCell, e.Edge))
+            .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
+            .ToList();
+        
+        var doorsB = roomB.GetExteriorEdgesWorld()
+            .Where(e => roomB.Template.CanPlaceDoor(e.LocalCell, e.Edge))
+            .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
+            .ToList();
+
+        if (doorsA.Count == 0 || doorsB.Count == 0)
+        {
+            // Fallback: use any exterior edge
+            var fallbackA = roomA.GetExteriorEdgesWorld().First();
+            var fallbackB = roomB.GetExteriorEdgesWorld().First();
+            doorsA = new List<(Cell WorldCell, Edge Edge)> { (fallbackA.WorldCell, fallbackA.Edge) };
+            doorsB = new List<(Cell WorldCell, Edge Edge)> { (fallbackB.WorldCell, fallbackB.Edge) };
+        }
+
+        // Shuffle for randomness
+        Shuffle(doorsA, rng);
+        Shuffle(doorsB, rng);
+
+        // Try door pairs until one works
+        IReadOnlyList<Cell>? path = null;
+        (Cell WorldCell, Edge Edge) doorA = default;
+        (Cell WorldCell, Edge Edge) doorB = default;
+        
+        foreach (var doorAOption in doorsA)
+        {
+            foreach (var doorBOption in doorsB)
+            {
+                try
+                {
+                    doorA = doorAOption;
+                    doorB = doorBOption;
+                    
+                    // Check if rooms are adjacent (no hallway needed)
+                    var adjacentCellA = GetAdjacentCell(doorA.WorldCell, doorA.Edge);
+                    var adjacentCellB = GetAdjacentCell(doorB.WorldCell, doorB.Edge);
+                    
+                    if (adjacentCellA == doorB.WorldCell && doorA.Edge.Opposite() == doorB.Edge)
+                    {
+                        // Rooms are adjacent, no hallway needed
+                        path = Array.Empty<Cell>();
+                        break;
+                    }
+                    
+                    // Try to find a hallway path
+                    path = FindHallwayPathForSecretPassage(
+                        doorA.WorldCell,
+                        doorA.Edge,
+                        doorB.WorldCell,
+                        doorB.Edge,
+                        occupiedCells);
+                    break; // Success!
+                }
+                catch
+                {
+                    // Try next door pair
+                    continue;
+                }
+            }
+            if (path != null) break;
+        }
+
+        if (path == null)
+        {
+            return null; // Couldn't find a valid connection
+        }
+
+        // Create doors
+        var doorAObj = new Door
+        {
+            Position = doorA.WorldCell,
+            Edge = doorA.Edge,
+            ConnectsToRoomId = roomB.NodeId
+        };
+
+        var doorBObj = new Door
+        {
+            Position = doorB.WorldCell,
+            Edge = doorB.Edge,
+            ConnectsToRoomId = roomA.NodeId
+        };
+
+        // Create hallway if needed
+        Hallway? hallway = null;
+        if (path.Count > 0)
+        {
+            var segments = PathToSegments(path);
+            hallway = new Hallway
+            {
+                Id = secretPassageId,
+                Segments = segments,
+                DoorA = doorAObj,
+                DoorB = doorBObj
+            };
+        }
+
+        return new SecretPassage
+        {
+            RoomAId = roomA.NodeId,
+            RoomBId = roomB.NodeId,
+            DoorA = doorAObj,
+            DoorB = doorBObj,
+            Hallway = hallway
+        };
+    }
+
+    private IReadOnlyList<Cell> FindHallwayPathForSecretPassage(
+        Cell startCell,
+        Edge startEdge,
+        Cell endCell,
+        Edge endEdge,
+        HashSet<Cell> occupied)
+    {
+        // Get the cell outside each door
+        Cell start = GetAdjacentCell(startCell, startEdge);
+        Cell end = GetAdjacentCell(endCell, endEdge);
+
+        // Calculate adaptive search radius
+        int manhattanDist = Math.Abs(start.X - end.X) + Math.Abs(start.Y - end.Y);
+        int adaptiveSearchRadius = Math.Max(5, Math.Min(manhattanDist / 2, 15));
+
+        // If the start cell is occupied, find an alternative
+        if (occupied.Contains(start))
+        {
+            var alternativeStart = FindNearestUnoccupiedCell(start, occupied, adaptiveSearchRadius);
+            if (alternativeStart.HasValue)
+            {
+                start = alternativeStart.Value;
+            }
+        }
+
+        // If the end cell is occupied, find an alternative
+        if (occupied.Contains(end))
+        {
+            var alternativeEnd = FindNearestUnoccupiedCell(end, occupied, adaptiveSearchRadius);
+            if (alternativeEnd.HasValue)
+            {
+                end = alternativeEnd.Value;
+            }
+        }
+
+        // A* pathfinding
+        var path = AStarForSecretPassage(start, end, occupied);
+
+        if (path == null)
+            throw new SpatialPlacementException($"Cannot find secret passage path from {start} to {end}");
+
+        return path;
+    }
+
+    private Cell? FindNearestUnoccupiedCell(Cell target, HashSet<Cell> occupied, int maxSearchRadius)
+    {
+        var queue = new Queue<Cell>();
+        var visited = new HashSet<Cell>();
+        queue.Enqueue(target);
+        visited.Add(target);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            
+            int distance = Math.Abs(current.X - target.X) + Math.Abs(current.Y - target.Y);
+            if (distance > maxSearchRadius)
+                break;
+
+            if (!occupied.Contains(current))
+                return current;
+
+            foreach (var neighbor in GetNeighborsForSecretPassage(current))
+            {
+                if (!visited.Contains(neighbor))
+                {
+                    visited.Add(neighbor);
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private IReadOnlyList<Cell>? AStarForSecretPassage(Cell start, Cell end, HashSet<Cell> occupied)
+    {
+        var openSet = new PriorityQueue<Cell, int>();
+        var closedSet = new HashSet<Cell>();
+        var cameFrom = new Dictionary<Cell, Cell>();
+        var gScore = new Dictionary<Cell, int> { [start] = 0 };
+
+        openSet.Enqueue(start, ManhattanDistance(start, end));
+
+        const int maxNodesExplored = 10000;
+        int nodesExplored = 0;
+
+        while (openSet.Count > 0)
+        {
+            var current = openSet.Dequeue();
+
+            if (closedSet.Contains(current))
+                continue;
+
+            closedSet.Add(current);
+            nodesExplored++;
+
+            if (nodesExplored >= maxNodesExplored)
+                return null;
+
+            if (current == end)
+            {
+                var pathList = new List<Cell>();
+                
+                if (current == start)
+                {
+                    pathList.Add(start);
+                    return pathList;
+                }
+                
+                var node = end;
+                pathList.Add(end);
+                
+                while (cameFrom.TryGetValue(node, out var prev))
+                {
+                    pathList.Add(prev);
+                    node = prev;
+                    if (node == start)
+                        break;
+                }
+                
+                if (pathList[pathList.Count - 1] != start)
+                {
+                    pathList.Add(start);
+                }
+                
+                pathList.Reverse();
+                return pathList;
+            }
+
+            foreach (var neighbor in GetNeighborsForSecretPassage(current))
+            {
+                if (closedSet.Contains(neighbor))
+                    continue;
+
+                if (occupied.Contains(neighbor) && neighbor != end)
+                    continue;
+
+                int tentativeG = gScore[current] + 1;
+
+                if (!gScore.ContainsKey(neighbor) || tentativeG < gScore[neighbor])
+                {
+                    cameFrom[neighbor] = current;
+                    gScore[neighbor] = tentativeG;
+                    int f = tentativeG + ManhattanDistance(neighbor, end);
+                    openSet.Enqueue(neighbor, f);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerable<Cell> GetNeighborsForSecretPassage(Cell cell)
+    {
+        yield return cell.North;
+        yield return cell.South;
+        yield return cell.East;
+        yield return cell.West;
+    }
+
+    private int ManhattanDistance(Cell a, Cell b)
+    {
+        return Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
+    }
+
+    private IReadOnlyList<HallwaySegment> PathToSegments(IReadOnlyList<Cell> path)
+    {
+        var segments = new List<HallwaySegment>();
+
+        if (path.Count < 2) return segments;
+
+        for (int i = 1; i < path.Count; i++)
+        {
+            var prev = path[i - 1];
+            var current = path[i];
+            int dx = Math.Abs(current.X - prev.X);
+            int dy = Math.Abs(current.Y - prev.Y);
+            int distance = dx + dy;
+            
+            if (distance != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid path: non-adjacent cells at index {i}. " +
+                    $"Cell {prev} -> {current} (distance: {distance}). " +
+                    $"Path length: {path.Count}");
+            }
+        }
+
+        Cell segmentStart = path[0];
+        Cell? lastDir = null;
+
+        for (int i = 1; i < path.Count; i++)
+        {
+            Cell current = path[i];
+            Cell prev = path[i - 1];
+            Cell dir = new Cell(current.X - prev.X, current.Y - prev.Y);
+
+            if (lastDir.HasValue && dir != lastDir.Value)
+            {
+                segments.Add(new HallwaySegment
+                {
+                    Start = segmentStart,
+                    End = prev
+                });
+                segmentStart = prev;
+            }
+
+            lastDir = dir;
+        }
+
+        segments.Add(new HallwaySegment
+        {
+            Start = segmentStart,
+            End = path[^1]
+        });
+
+        return segments;
+    }
+
+    private static void Shuffle<T>(IList<T> list, Random rng)
+    {
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = rng.Next(n + 1);
+            (list[k], list[n]) = (list[n], list[k]);
+        }
     }
 }
 

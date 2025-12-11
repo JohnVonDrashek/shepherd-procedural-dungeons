@@ -149,6 +149,7 @@ public IReadOnlyList<IConstraint<TRoomType>> Constraints { get; init; }
 public float BranchingFactor { get; init; }  // Default: 0.3f
 public HallwayMode HallwayMode { get; init; }  // Default: HallwayMode.AsNeeded
 public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }  // Optional zones
+public SecretPassageConfig<TRoomType>? SecretPassageConfig { get; init; }  // Optional secret passages
 ```
 
 ## FloorLayout<TRoomType>
@@ -167,12 +168,14 @@ public required int SpawnRoomId { get; init; }
 public required int BossRoomId { get; init; }
 public IReadOnlyDictionary<int, string>? ZoneAssignments { get; init; }  // Node ID -> Zone ID
 public IReadOnlyList<PlacedRoom<TRoomType>> TransitionRooms { get; init; }  // Rooms connecting zones
+public required IReadOnlyList<SecretPassage> SecretPassages { get; init; }  // Secret passages
 ```
 
 ### Methods
 
 ```csharp
 public PlacedRoom<TRoomType>? GetRoom(int nodeId)
+public IEnumerable<SecretPassage> GetSecretPassagesForRoom(int roomId)
 public IEnumerable<Cell> GetAllRoomCells()
 public IEnumerable<Cell> GetAllHallwayCells()
 public (Cell Min, Cell Max) GetBounds()
@@ -834,6 +837,38 @@ public interface IZoneAwareConstraint<TRoomType> where TRoomType : Enum
 ```
 
 **Use case:** Implement zone-aware constraints that need to know which zone a room belongs to.
+
+## SecretPassageConfig<TRoomType>
+
+Configuration for generating secret passages.
+
+### Properties
+
+```csharp
+public int Count { get; init; }  // Default: 0
+public int MaxSpatialDistance { get; init; }  // Default: 5
+public IReadOnlySet<TRoomType> AllowedRoomTypes { get; init; }  // Default: empty
+public IReadOnlySet<TRoomType> ForbiddenRoomTypes { get; init; }  // Default: empty
+public bool AllowCriticalPathConnections { get; init; }  // Default: true
+public bool AllowGraphConnectedRooms { get; init; }  // Default: false
+```
+
+## SecretPassage
+
+Represents a secret passage connecting two rooms.
+
+### Properties
+
+```csharp
+public required int RoomAId { get; init; }
+public required int RoomBId { get; init; }
+public required Door DoorA { get; init; }
+public required Door DoorB { get; init; }
+public Hallway? Hallway { get; init; }
+public bool RequiresHallway { get; }
+```
+
+**RequiresHallway**: Returns `true` if this secret passage requires a hallway (rooms are not adjacent).
 
 ## Namespaces
 

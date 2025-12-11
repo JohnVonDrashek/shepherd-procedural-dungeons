@@ -328,6 +328,125 @@ foreach (var hallway in layout.Hallways)
 }
 ```
 
+## Secret Passages
+
+Secret passages are hidden connections between rooms that are not part of the main dungeon graph.
+
+### Accessing Secret Passages
+
+```csharp
+// Get all secret passages
+var secretPassages = layout.SecretPassages;
+
+Console.WriteLine($"Found {secretPassages.Count} secret passages");
+
+foreach (var passage in secretPassages)
+{
+    Console.WriteLine($"Secret passage connects room {passage.RoomAId} to {passage.RoomBId}");
+    Console.WriteLine($"  Door A at ({passage.DoorA.Position.X}, {passage.DoorA.Position.Y})");
+    Console.WriteLine($"  Door B at ({passage.DoorB.Position.X}, {passage.DoorB.Position.Y})");
+    
+    if (passage.RequiresHallway)
+    {
+        Console.WriteLine($"  Has hallway with {passage.Hallway.Segments.Count} segments");
+    }
+}
+```
+
+### Finding Secret Passages for a Room
+
+```csharp
+// Get all secret passages connected to a specific room
+var roomId = 5;
+var passages = layout.GetSecretPassagesForRoom(roomId);
+
+foreach (var passage in passages)
+{
+    var otherRoomId = passage.RoomAId == roomId ? passage.RoomBId : passage.RoomAId;
+    Console.WriteLine($"Room {roomId} has secret passage to room {otherRoomId}");
+}
+```
+
+### Secret Passage Properties
+
+```csharp
+var passage = layout.SecretPassages[0];
+
+// Room IDs
+int roomA = passage.RoomAId;
+int roomB = passage.RoomBId;
+
+// Doors
+Door doorA = passage.DoorA;
+Door doorB = passage.DoorB;
+
+// Optional hallway
+if (passage.RequiresHallway)
+{
+    Hallway hallway = passage.Hallway;
+    // Use hallway segments for rendering
+}
+```
+
+### Rendering Secret Passages
+
+Secret passages should typically be rendered differently from regular connections (e.g., hidden walls that can be discovered):
+
+```csharp
+// Render secret passages as hidden/secret doors
+foreach (var passage in layout.SecretPassages)
+{
+    // Render door A (hidden)
+    RenderSecretDoor(passage.DoorA.Position, passage.DoorA.Edge);
+    
+    // Render door B (hidden)
+    RenderSecretDoor(passage.DoorB.Position, passage.DoorB.Edge);
+    
+    // Render hallway if present
+    if (passage.RequiresHallway)
+    {
+        foreach (var segment in passage.Hallway.Segments)
+        {
+            foreach (var cell in segment.GetCells())
+            {
+                RenderSecretHallway(cell);
+            }
+        }
+    }
+}
+```
+
+### Game Integration
+
+Secret passages enable gameplay mechanics like:
+- **Hidden shortcuts**: Players can discover faster routes
+- **Exploration rewards**: Secret passages lead to hidden areas
+- **Alternative routes**: Bypass dangerous areas or provide speedrun paths
+
+```csharp
+// Check if a room has secret passages
+bool hasSecrets = layout.GetSecretPassagesForRoom(roomId).Any();
+
+// Reveal secret passage when player interacts with wall
+public void OnWallInteraction(int roomId, Cell position)
+{
+    var passages = layout.GetSecretPassagesForRoom(roomId);
+    var passage = passages.FirstOrDefault(p => 
+        p.DoorA.Position == position || p.DoorB.Position == position);
+    
+    if (passage != null)
+    {
+        RevealSecretPassage(passage);
+    }
+}
+```
+
+**Important Notes:**
+- Secret passages **don't affect** the main graph topology (critical path, distances, etc.)
+- Secret passages connect **spatially close** rooms (within MaxSpatialDistance)
+- Secret passages can optionally exclude graph-connected or critical path rooms
+- Secret passages are generated **deterministically** based on seed
+
 ## Statistics
 
 Calculate dungeon statistics:
@@ -338,6 +457,7 @@ var stats = new
     TotalRooms = layout.Rooms.Count,
     TotalHallways = layout.Hallways.Count,
     TotalDoors = layout.Doors.Count,
+    TotalSecretPassages = layout.SecretPassages.Count,
     CriticalPathLength = layout.CriticalPath.Count,
     
     RoomTypeCounts = layout.Rooms

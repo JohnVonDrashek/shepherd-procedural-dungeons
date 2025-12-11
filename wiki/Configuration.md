@@ -350,6 +350,69 @@ if (layout.ZoneAssignments != null)
 
 See [Advanced Topics](Advanced-Topics#zones) for more details on zones.
 
+### SecretPassageConfig
+
+```csharp
+SecretPassageConfig = new SecretPassageConfig<RoomType>
+{
+    Count = 3,
+    MaxSpatialDistance = 5,
+    AllowedRoomTypes = new HashSet<RoomType> { RoomType.Treasure },
+    ForbiddenRoomTypes = new HashSet<RoomType> { RoomType.Boss },
+    AllowCriticalPathConnections = true,
+    AllowGraphConnectedRooms = false
+}
+```
+
+**Type:** `SecretPassageConfig<TRoomType>?`
+
+**Default:** `null` (secret passages disabled)
+
+**Description:** Configuration for generating secret passages - hidden connections between rooms that are not part of the main dungeon graph.
+
+**Properties:**
+
+- **Count** (int, default: 0) - Number of secret passages to generate. Set to 0 to disable secret passages.
+- **MaxSpatialDistance** (int, default: 5) - Maximum spatial distance (in cells) between rooms for secret passage eligibility. Rooms further apart won't be connected.
+- **AllowedRoomTypes** (IReadOnlySet<TRoomType>, default: empty) - Room types that can have secret passages. If empty, all room types are eligible.
+- **ForbiddenRoomTypes** (IReadOnlySet<TRoomType>, default: empty) - Room types that cannot have secret passages.
+- **AllowCriticalPathConnections** (bool, default: true) - Whether secret passages can connect rooms on the critical path.
+- **AllowGraphConnectedRooms** (bool, default: false) - Whether secret passages can connect rooms that are already graph-connected. Set to false to ensure secret passages provide alternative routes.
+
+**How Secret Passages Work:**
+
+Secret passages are hidden connections that:
+- **Don't affect graph topology** - They don't change the critical path, distances, or graph structure
+- **Connect spatially close rooms** - They link rooms that are physically near each other (within MaxSpatialDistance)
+- **Are optional shortcuts** - They provide alternative routes without affecting main dungeon flow
+- **Can be discovered** - Games can reveal them through gameplay mechanics (pressing walls, finding switches, etc.)
+
+**Example:**
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 3,  // Generate 3 secret passages
+        MaxSpatialDistance = 5,  // Only connect rooms within 5 cells
+        AllowedRoomTypes = new HashSet<RoomType> { RoomType.Treasure },  // Only connect treasure rooms
+        AllowGraphConnectedRooms = false,  // Only connect rooms not already connected
+        AllowCriticalPathConnections = false  // Don't connect critical path rooms
+    }
+};
+```
+
+**Tips:**
+- Use secret passages to create shortcuts and alternative routes
+- Set `AllowGraphConnectedRooms = false` to ensure secret passages provide new paths
+- Use `AllowedRoomTypes` or `ForbiddenRoomTypes` to control which room types can have secret passages
+- Secret passages are generated deterministically based on seed
+- Secret passages can include hallways if rooms are not adjacent (similar to regular connections)
+
+See [Working with Output](Working-with-Output#secret-passages) for how to access secret passages in generated layouts.
+
 ## Complete Example
 
 ```csharp

@@ -54,9 +54,22 @@ public sealed class FloorLayout<TRoomType> where TRoomType : Enum
     public IReadOnlyList<PlacedRoom<TRoomType>> TransitionRooms { get; init; } = Array.Empty<PlacedRoom<TRoomType>>();
 
     /// <summary>
+    /// All secret passages in this floor.
+    /// </summary>
+    public required IReadOnlyList<SecretPassage> SecretPassages { get; init; }
+
+    /// <summary>
     /// Gets a room by its node ID.
     /// </summary>
     public PlacedRoom<TRoomType>? GetRoom(int nodeId) => Rooms.FirstOrDefault(r => r.NodeId == nodeId);
+
+    /// <summary>
+    /// Gets all secret passages connected to a specific room.
+    /// </summary>
+    public IEnumerable<SecretPassage> GetSecretPassagesForRoom(int roomId)
+    {
+        return SecretPassages.Where(sp => sp.RoomAId == roomId || sp.RoomBId == roomId);
+    }
 
     /// <summary>
     /// Gets all cells occupied by rooms (not hallways).

@@ -279,6 +279,43 @@ Zones can have:
 - Zone assignments are deterministic (same seed = same assignments)
 - Transition rooms (connecting different zones) are automatically identified
 
+## Secret Passages
+
+### What They Are
+
+Secret passages are **hidden connections** between rooms that are not part of the main dungeon graph. They enable:
+- **Shortcuts**: Alternative routes that bypass main paths
+- **Exploration rewards**: Hidden connections discoverable through gameplay
+- **Alternative routes**: Options for speedrunners or exploration-focused players
+
+### Key Properties
+
+- **Don't affect graph topology**: Secret passages don't change the critical path, distances, or graph structure
+- **Spatially placed**: They connect rooms that are physically close (within MaxSpatialDistance)
+- **Optional shortcuts**: They provide alternative routes without affecting main dungeon flow
+- **Discoverable**: Games can reveal them through gameplay mechanics (pressing walls, finding switches, etc.)
+
+### How They Work
+
+Secret passages are generated **after** spatial placement:
+1. Find candidate room pairs that are spatially close
+2. Filter by room type constraints (allowed/forbidden types)
+3. Optionally exclude graph-connected or critical path rooms
+4. Select passages based on configuration
+5. Generate doors and optional hallways
+
+### Configuration
+
+Secret passages are configured via `SecretPassageConfig`:
+- **Count**: How many secret passages to generate
+- **MaxSpatialDistance**: Maximum distance between rooms
+- **AllowedRoomTypes**: Which room types can have secret passages
+- **ForbiddenRoomTypes**: Which room types cannot have secret passages
+- **AllowCriticalPathConnections**: Whether to allow connections on critical path
+- **AllowGraphConnectedRooms**: Whether to allow connections between already-connected rooms
+
+See [Configuration](Configuration#secretpassageconfig) for details.
+
 ## Generation Pipeline
 
 ```
@@ -298,9 +335,11 @@ Zones can have:
    ↓
 8. Place Doors
    ↓
-9. Identify Transition Rooms (if zones configured)
+9. Generate Secret Passages (if configured)
    ↓
-10. Return FloorLayout
+10. Identify Transition Rooms (if zones configured)
+   ↓
+11. Return FloorLayout
 ```
 
 ## Key Principles

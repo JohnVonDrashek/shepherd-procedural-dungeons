@@ -63,5 +63,10 @@ public sealed class FloorConfig<TRoomType> where TRoomType : Enum
     /// Optional zones for biome/thematic partitioning of the dungeon.
     /// </summary>
     public IReadOnlyList<Zone<TRoomType>>? Zones { get; init; }
+
+    /// <summary>
+    /// Configuration for secret passage generation.
+    /// </summary>
+    public SecretPassageConfig<TRoomType>? SecretPassageConfig { get; init; }
 }
 

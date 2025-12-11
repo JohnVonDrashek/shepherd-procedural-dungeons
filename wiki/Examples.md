@@ -1584,6 +1584,194 @@ var config = new FloorConfig<RoomType>
 
 This creates zones based on progression along the critical path, ensuring shops appear early and boss appears late.
 
+## Secret Passages Example
+
+Example using secret passages to create hidden shortcuts and alternative routes:
+
+```csharp
+using ShepherdProceduralDungeons;
+using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
+using ShepherdProceduralDungeons.Templates;
+
+public enum RoomType
+{
+    Spawn, Boss, Combat, Shop, Treasure
+}
+
+var templates = new List<RoomTemplate<RoomType>>
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("spawn")
+        .ForRoomTypes(RoomType.Spawn)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("boss")
+        .ForRoomTypes(RoomType.Boss)
+        .WithDoorsOnSides(Edge.South)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 3)
+        .WithId("shop")
+        .ForRoomTypes(RoomType.Shop)
+        .WithDoorsOnSides(Edge.South | Edge.North)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(2, 2)
+        .WithId("treasure")
+        .ForRoomTypes(RoomType.Treasure)
+        .WithDoorsOnSides(Edge.All)
+        .Build()
+};
+
+var config = new FloorConfig<RoomType>
+{
+    Seed = 12345,
+    RoomCount = 15,
+    SpawnRoomType = RoomType.Spawn,
+    BossRoomType = RoomType.Boss,
+    DefaultRoomType = RoomType.Combat,
+    RoomRequirements = new[]
+    {
+        (RoomType.Shop, 1),
+        (RoomType.Treasure, 3)
+    },
+    Constraints = new List<IConstraint<RoomType>>
+    {
+        new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 6),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Boss),
+        new NotOnCriticalPathConstraint<RoomType>(RoomType.Treasure),
+        new MustBeDeadEndConstraint<RoomType>(RoomType.Treasure)
+    },
+    Templates = templates,
+    BranchingFactor = 0.3f,
+    HallwayMode = HallwayMode.AsNeeded,
+    // Configure secret passages
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 3,  // Generate 3 secret passages
+        MaxSpatialDistance = 5,  // Only connect rooms within 5 cells
+        AllowedRoomTypes = new HashSet<RoomType> { RoomType.Treasure },  // Only connect treasure rooms
+        AllowGraphConnectedRooms = false,  // Only connect rooms not already connected
+        AllowCriticalPathConnections = false  // Don't connect critical path rooms
+    }
+};
+
+var generator = new FloorGenerator<RoomType>();
+var layout = generator.Generate(config);
+
+// Access secret passages
+Console.WriteLine($"Generated {layout.SecretPassages.Count} secret passages");
+
+foreach (var passage in layout.SecretPassages)
+{
+    var roomA = layout.GetRoom(passage.RoomAId);
+    var roomB = layout.GetRoom(passage.RoomBId);
+    
+    Console.WriteLine($"Secret passage: Room {passage.RoomAId} ({roomA.RoomType}) <-> Room {passage.RoomBId} ({roomB.RoomType})");
+    Console.WriteLine($"  Door A at ({passage.DoorA.Position.X}, {passage.DoorA.Position.Y})");
+    Console.WriteLine($"  Door B at ({passage.DoorB.Position.X}, {passage.DoorB.Position.Y})");
+    
+    if (passage.RequiresHallway)
+    {
+        Console.WriteLine($"  Has hallway with {passage.Hallway.Segments.Count} segments");
+    }
+}
+
+// Find secret passages for a specific room
+var treasureRoom = layout.Rooms.First(r => r.RoomType == RoomType.Treasure);
+var secretPassages = layout.GetSecretPassagesForRoom(treasureRoom.NodeId);
+
+Console.WriteLine($"Room {treasureRoom.NodeId} has {secretPassages.Count()} secret passages");
+```
+
+### Secret Passages with Different Constraints
+
+Example with more flexible secret passage configuration:
+
+```csharp
+var config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 5,  // More secret passages
+        MaxSpatialDistance = 7,  // Allow longer connections
+        ForbiddenRoomTypes = new HashSet<RoomType> { RoomType.Boss },  // Don't connect boss rooms
+        AllowGraphConnectedRooms = true,  // Allow connections between already-connected rooms
+        AllowCriticalPathConnections = true  // Allow connections on critical path
+    }
+};
+```
+
+### Using Secret Passages in Gameplay
+
+Example of integrating secret passages into game logic:
+
+```csharp
+public class DungeonManager
+{
+    private FloorLayout<RoomType> _layout;
+    private HashSet<int> _discoveredSecretPassages = new();
+    
+    public void GenerateDungeon(int seed)
+    {
+        var config = CreateConfig(seed);
+        var generator = new FloorGenerator<RoomType>();
+        _layout = generator.Generate(config);
+    }
+    
+    // Check if player can discover a secret passage
+    public bool TryDiscoverSecretPassage(int roomId, Cell wallPosition)
+    {
+        var passages = _layout.GetSecretPassagesForRoom(roomId);
+        
+        foreach (var passage in passages)
+        {
+            // Check if player is interacting with a secret door
+            if (passage.DoorA.Position == wallPosition || passage.DoorB.Position == wallPosition)
+            {
+                if (!_discoveredSecretPassages.Contains(passage.RoomAId * 1000 + passage.RoomBId))
+                {
+                    _discoveredSecretPassages.Add(passage.RoomAId * 1000 + passage.RoomBId);
+                    RevealSecretPassage(passage);
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // Get all secret passages connected to a room (for rendering)
+    public IEnumerable<SecretPassage> GetSecretPassagesForRoom(int roomId)
+    {
+        return _layout.GetSecretPassagesForRoom(roomId);
+    }
+    
+    // Check if a secret passage is discovered
+    public bool IsSecretPassageDiscovered(SecretPassage passage)
+    {
+        return _discoveredSecretPassages.Contains(passage.RoomAId * 1000 + passage.RoomBId);
+    }
+}
+```
+
+This example demonstrates:
+- **Hidden shortcuts**: Secret passages connect treasure rooms, creating shortcuts
+- **Exploration rewards**: Players can discover secret passages through gameplay
+- **Alternative routes**: Secret passages provide paths that bypass main routes
+- **Room type filtering**: Only treasure rooms have secret passages
+- **Graph independence**: Secret passages don't affect critical path or distances
+
 ## Testing Example
 
 Example of testing dungeon generation:
@@ -1631,10 +1819,54 @@ public void Generate_SameSeed_SameOutput()
 }
 ```
 
+## Secret Passages with Multi-Floor Dungeons
+
+Secret passages work with multi-floor dungeons - each floor can have its own secret passage configuration:
+
+```csharp
+// Floor 0 configuration with secret passages
+var floor0Config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 2,
+        MaxSpatialDistance = 5
+    }
+};
+
+// Floor 1 configuration with more secret passages
+var floor1Config = new FloorConfig<RoomType>
+{
+    // ... other config ...
+    SecretPassageConfig = new SecretPassageConfig<RoomType>
+    {
+        Count = 4,  // More secret passages on deeper floor
+        MaxSpatialDistance = 7
+    }
+};
+
+var multiFloorConfig = new MultiFloorConfig<RoomType>
+{
+    Seed = 12345,
+    Floors = new[] { floor0Config, floor1Config },
+    Connections = connections
+};
+
+var generator = new MultiFloorGenerator<RoomType>();
+var multiFloorLayout = generator.Generate(multiFloorConfig);
+
+// Access secret passages per floor
+foreach (var floor in multiFloorLayout.Floors)
+{
+    Console.WriteLine($"Floor has {floor.SecretPassages.Count} secret passages");
+}
+```
+
 ## Next Steps
 
 - **[Getting Started](Getting-Started)** - Learn the basics
 - **[Room Templates](Room-Templates)** - Create custom shapes
 - **[Constraints](Constraints)** - Control room placement
-- **[Working with Output](Working-with-Output)** - Use generated layouts
+- **[Working with Output](Working-with-Output)** - Use generated layouts, including secret passages
 
