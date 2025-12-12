@@ -646,8 +646,8 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         }
 
         // Shuffle for randomness
-        Shuffle(doorsA, rng);
-        Shuffle(doorsB, rng);
+        CollectionUtilities.Shuffle(doorsA, rng);
+        CollectionUtilities.Shuffle(doorsB, rng);
 
         // Try door pairs until one works
         IReadOnlyList<Cell>? path = null;
@@ -716,7 +716,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         Hallway? hallway = null;
         if (path.Count > 0)
         {
-            var segments = PathToSegments(path);
+            var segments = HallwayUtilities.PathToSegments(path);
             hallway = new Hallway
             {
                 Id = secretPassageId,
@@ -754,7 +754,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         // If the start cell is occupied, find an alternative
         if (occupied.Contains(start))
         {
-            var alternativeStart = FindNearestUnoccupiedCell(start, occupied, adaptiveSearchRadius);
+            var alternativeStart = PathfindingUtilities.FindNearestUnoccupiedCell(start, occupied, adaptiveSearchRadius, PathfindingUtilities.GetNeighbors);
             if (alternativeStart.HasValue)
             {
                 start = alternativeStart.Value;
@@ -764,7 +764,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         // If the end cell is occupied, find an alternative
         if (occupied.Contains(end))
         {
-            var alternativeEnd = FindNearestUnoccupiedCell(end, occupied, adaptiveSearchRadius);
+            var alternativeEnd = PathfindingUtilities.FindNearestUnoccupiedCell(end, occupied, adaptiveSearchRadius, PathfindingUtilities.GetNeighbors);
             if (alternativeEnd.HasValue)
             {
                 end = alternativeEnd.Value;
@@ -772,7 +772,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         }
 
         // A* pathfinding
-        var path = AStarForSecretPassage(start, end, occupied);
+        var path = PathfindingUtilities.AStar(start, end, occupied, new AStarOptions { MaxNodesExplored = 10000 });
 
         if (path == null)
             throw new SpatialPlacementException($"Cannot find secret passage path from {start} to {end}");
@@ -780,192 +780,8 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         return path;
     }
 
-    private Cell? FindNearestUnoccupiedCell(Cell target, HashSet<Cell> occupied, int maxSearchRadius)
-    {
-        var queue = new Queue<Cell>();
-        var visited = new HashSet<Cell>();
-        queue.Enqueue(target);
-        visited.Add(target);
 
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-            
-            int distance = Math.Abs(current.X - target.X) + Math.Abs(current.Y - target.Y);
-            if (distance > maxSearchRadius)
-                break;
 
-            if (!occupied.Contains(current))
-                return current;
-
-            foreach (var neighbor in GetNeighborsForSecretPassage(current))
-            {
-                if (!visited.Contains(neighbor))
-                {
-                    visited.Add(neighbor);
-                    queue.Enqueue(neighbor);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private IReadOnlyList<Cell>? AStarForSecretPassage(Cell start, Cell end, HashSet<Cell> occupied)
-    {
-        var openSet = new PriorityQueue<Cell, int>();
-        var closedSet = new HashSet<Cell>();
-        var cameFrom = new Dictionary<Cell, Cell>();
-        var gScore = new Dictionary<Cell, int> { [start] = 0 };
-
-        openSet.Enqueue(start, ManhattanDistance(start, end));
-
-        const int maxNodesExplored = 10000;
-        int nodesExplored = 0;
-
-        while (openSet.Count > 0)
-        {
-            var current = openSet.Dequeue();
-
-            if (closedSet.Contains(current))
-                continue;
-
-            closedSet.Add(current);
-            nodesExplored++;
-
-            if (nodesExplored >= maxNodesExplored)
-                return null;
-
-            if (current == end)
-            {
-                var pathList = new List<Cell>();
-                
-                if (current == start)
-                {
-                    pathList.Add(start);
-                    return pathList;
-                }
-                
-                var node = end;
-                pathList.Add(end);
-                
-                while (cameFrom.TryGetValue(node, out var prev))
-                {
-                    pathList.Add(prev);
-                    node = prev;
-                    if (node == start)
-                        break;
-                }
-                
-                if (pathList[pathList.Count - 1] != start)
-                {
-                    pathList.Add(start);
-                }
-                
-                pathList.Reverse();
-                return pathList;
-            }
-
-            foreach (var neighbor in GetNeighborsForSecretPassage(current))
-            {
-                if (closedSet.Contains(neighbor))
-                    continue;
-
-                if (occupied.Contains(neighbor) && neighbor != end)
-                    continue;
-
-                int tentativeG = gScore[current] + 1;
-
-                if (!gScore.ContainsKey(neighbor) || tentativeG < gScore[neighbor])
-                {
-                    cameFrom[neighbor] = current;
-                    gScore[neighbor] = tentativeG;
-                    int f = tentativeG + ManhattanDistance(neighbor, end);
-                    openSet.Enqueue(neighbor, f);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private IEnumerable<Cell> GetNeighborsForSecretPassage(Cell cell)
-    {
-        yield return cell.North;
-        yield return cell.South;
-        yield return cell.East;
-        yield return cell.West;
-    }
-
-    private int ManhattanDistance(Cell a, Cell b)
-    {
-        return Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
-    }
-
-    private IReadOnlyList<HallwaySegment> PathToSegments(IReadOnlyList<Cell> path)
-    {
-        var segments = new List<HallwaySegment>();
-
-        if (path.Count < 2) return segments;
-
-        for (int i = 1; i < path.Count; i++)
-        {
-            var prev = path[i - 1];
-            var current = path[i];
-            int dx = Math.Abs(current.X - prev.X);
-            int dy = Math.Abs(current.Y - prev.Y);
-            int distance = dx + dy;
-            
-            if (distance != 1)
-            {
-                throw new InvalidOperationException(
-                    $"Invalid path: non-adjacent cells at index {i}. " +
-                    $"Cell {prev} -> {current} (distance: {distance}). " +
-                    $"Path length: {path.Count}");
-            }
-        }
-
-        Cell segmentStart = path[0];
-        Cell? lastDir = null;
-
-        for (int i = 1; i < path.Count; i++)
-        {
-            Cell current = path[i];
-            Cell prev = path[i - 1];
-            Cell dir = new Cell(current.X - prev.X, current.Y - prev.Y);
-
-            if (lastDir.HasValue && dir != lastDir.Value)
-            {
-                segments.Add(new HallwaySegment
-                {
-                    Start = segmentStart,
-                    End = prev
-                });
-                segmentStart = prev;
-            }
-
-            lastDir = dir;
-        }
-
-        segments.Add(new HallwaySegment
-        {
-            Start = segmentStart,
-            End = path[^1]
-        });
-
-        return segments;
-    }
-
-    private static void Shuffle<T>(IList<T> list, Random rng)
-    {
-        int n = list.Count;
-        while (n > 1)
-        {
-            n--;
-            int k = rng.Next(n + 1);
-            (list[k], list[n]) = (list[n], list[k]);
-        }
-    }
 
     private ClusterConfig<TRoomType> ApplyClusterConstraints(
         ClusterConfig<TRoomType> baseConfig,

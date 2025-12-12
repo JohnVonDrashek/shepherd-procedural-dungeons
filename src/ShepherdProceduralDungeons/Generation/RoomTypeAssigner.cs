@@ -138,7 +138,7 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                 .ToList();
 
             // Shuffle candidates for randomness
-            Shuffle(candidates, rng);
+            CollectionUtilities.Shuffle(candidates, rng);
 
             foreach (var node in candidates)
             {
@@ -182,7 +182,7 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                     .ToList();
 
                 // Shuffle candidates for randomness
-                Shuffle(candidates, rng);
+                CollectionUtilities.Shuffle(candidates, rng);
 
                 foreach (var node in candidates)
                 {
@@ -280,15 +280,5 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
         return priority;
     }
 
-    private static void Shuffle<T>(IList<T> list, Random rng)
-    {
-        int n = list.Count;
-        while (n > 1)
-        {
-            n--;
-            int k = rng.Next(n + 1);
-            (list[k], list[n]) = (list[n], list[k]);
-        }
-    }
 }
 

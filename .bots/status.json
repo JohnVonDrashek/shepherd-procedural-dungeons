@@ -1,8 +1,40 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-12T22:30:00Z",
+  "lastUpdated": "2025-12-13T00:00:00Z",
   "nextFeatureId": 4,
   "nextOptimizationId": 7,
+  "nextRefactoringId": 2,
+  "refactorings": [
+    {
+      "id": "REFACTOR-001",
+      "title": "Eliminate Duplicate Pathfinding and Utility Code",
+      "status": "complete",
+      "category": "code_smell",
+      "priority": "high",
+      "estimatedImpact": "high",
+      "estimatedEffort": "medium",
+      "riskLevel": "medium",
+      "created": "2025-12-12T21:47:15Z",
+      "updated": "2025-12-13T00:00:00Z",
+      "refactoringFile": ".bots/refactorings/REFACTOR-001-eliminate-duplicate-pathfinding-utilities.md",
+      "filesAffected": [
+        "src/ShepherdProceduralDungeons/Generation/HallwayGenerator.cs",
+        "src/ShepherdProceduralDungeons/FloorGenerator.cs",
+        "src/ShepherdProceduralDungeons/Generation/IncrementalSolver.cs",
+        "src/ShepherdProceduralDungeons/Generation/RoomTypeAssigner.cs",
+        "src/ShepherdProceduralDungeons/Generation/CollectionUtilities.cs",
+        "src/ShepherdProceduralDungeons/Generation/PathfindingUtilities.cs",
+        "src/ShepherdProceduralDungeons/Generation/HallwayUtilities.cs"
+      ],
+      "testsAffected": [],
+      "notes": [
+        "Detailed refactoring plan created with 7 incremental steps. Plan includes extraction of Shuffle, ManhattanDistance, GetNeighbors, FindNearestUnoccupiedCell, PathToSegments, and unification of A* pathfinding implementations. All steps are independently verifiable through existing tests.",
+        "Refactoring complete: All 7 steps implemented successfully. Created CollectionUtilities, PathfindingUtilities, and HallwayUtilities classes. Unified A* implementations with configurable options. Removed ~410 lines of duplicate code. All 417 tests pass (exit code 0).",
+        "Verification complete: All 417 tests pass. Behavior unchanged. Code quality significantly improved: eliminated ~410 lines of duplicate code, improved maintainability and readability, centralized pathfinding logic. No regressions detected. Build successful with no errors.",
+        "Documentation complete: Added comprehensive summary section to refactoring file documenting achievements, techniques used, and lessons learned. Refactoring marked as complete in status.json."
+      ]
+    }
+  ],
   "features": [
     {
       "id": "FEATURE-001",

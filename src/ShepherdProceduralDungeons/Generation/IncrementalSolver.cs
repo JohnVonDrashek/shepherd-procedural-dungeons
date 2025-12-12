@@ -159,7 +159,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
             .ToList();
 
         // Shuffle for randomness
-        Shuffle(templateDoorEdges, rng);
+        CollectionUtilities.Shuffle(templateDoorEdges, rng);
 
         foreach (var (templateCell, templateEdge) in templateDoorEdges)
         {
@@ -170,7 +170,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 .Where(e => e.Edge == requiredExistingEdge && existingRoom.Template.CanPlaceDoor(e.LocalCell, e.Edge))
                 .ToList();
 
-            Shuffle(compatibleEdges, rng);
+            CollectionUtilities.Shuffle(compatibleEdges, rng);
 
             foreach (var existingEdge in compatibleEdges)
             {
@@ -401,15 +401,5 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         }
     }
 
-    private static void Shuffle<T>(IList<T> list, Random rng)
-    {
-        int n = list.Count;
-        while (n > 1)
-        {
-            n--;
-            int k = rng.Next(n + 1);
-            (list[k], list[n]) = (list[n], list[k]);
-        }
-    }
 }
 
