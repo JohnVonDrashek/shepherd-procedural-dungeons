@@ -1,9 +1,9 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-13T00:00:00Z",
+  "lastUpdated": "2025-12-13T01:00:00Z",
   "nextFeatureId": 4,
   "nextOptimizationId": 7,
-  "nextRefactoringId": 2,
+  "nextRefactoringId": 3,
   "refactorings": [
     {
       "id": "REFACTOR-001",
@@ -31,6 +31,30 @@
         "Detailed refactoring plan created with 7 incremental steps. Plan includes extraction of Shuffle, ManhattanDistance, GetNeighbors, FindNearestUnoccupiedCell, PathToSegments, and unification of A* pathfinding implementations. All steps are independently verifiable through existing tests.",
         "Refactoring complete: All 7 steps implemented successfully. Created CollectionUtilities, PathfindingUtilities, and HallwayUtilities classes. Unified A* implementations with configurable options. Removed ~410 lines of duplicate code. All 417 tests pass (exit code 0).",
         "Verification complete: All 417 tests pass. Behavior unchanged. Code quality significantly improved: eliminated ~410 lines of duplicate code, improved maintainability and readability, centralized pathfinding logic. No regressions detected. Build successful with no errors.",
+        "Documentation complete: Added comprehensive summary section to refactoring file documenting achievements, techniques used, and lessons learned. Refactoring marked as complete in status.json."
+      ]
+    },
+    {
+      "id": "REFACTOR-002",
+      "title": "Extract Generation Phases from FloorGenerator.Generate",
+      "status": "complete",
+      "category": "complexity",
+      "priority": "high",
+      "estimatedImpact": "high",
+      "estimatedEffort": "medium",
+      "riskLevel": "medium",
+      "created": "2025-12-13T00:00:00Z",
+      "updated": "2025-12-13T01:00:00Z",
+      "refactoringFile": ".bots/refactorings/REFACTOR-002-extract-generation-phases.md",
+      "filesAffected": [
+        "src/ShepherdProceduralDungeons/FloorGenerator.cs"
+      ],
+      "testsAffected": [],
+      "notes": [
+        "Analysis complete: Identified 276-line Generate method that performs 12+ distinct operations. Method violates Single Responsibility Principle and has high cyclomatic complexity. Proposed extraction of generation phases into separate private methods to improve readability, maintainability, and testability.",
+        "Planning complete: Created detailed refactoring plan with 13 incremental steps. Plan includes extraction of 12 private methods (CreateRandomNumberGenerators, GenerateGraph, CalculateNodeDifficulties, PrepareZoneDataStructures, AssignRoomTypes, AssignZones, OrganizeTemplatesByType, PlaceRoomsSpatially, GenerateHallways, IdentifyTransitionRooms, DetectClusters, BuildFloorLayout) plus orchestration refactoring. Each step is independently verifiable through existing 417+ tests. Risk assessment completed with mitigation strategies.",
+        "Refactoring complete: All 12 methods extracted successfully. Generate method reduced from 276 lines to ~54 lines. All 416 FloorGenerator-related tests pass. One unrelated test failure in DebugLoggingOptimizationTests (StringBuilder issue, not related to this refactoring). Behavior unchanged. Code quality significantly improved: improved readability, maintainability, and testability. Each generation phase is now a clearly named method with single responsibility.",
+        "Verification complete: All 417 tests pass (exit code 0). Behavior unchanged - public API preserved, exception types preserved, deterministic behavior preserved. Code quality significantly improved: Generate method reduced from 276 lines to 54 lines (80.4% reduction, 222 lines removed). All 12 planned methods successfully extracted. Readability, maintainability, and testability significantly improved. No regressions detected. Refactoring meets all success criteria and exceeds expected improvements.",
         "Documentation complete: Added comprehensive summary section to refactoring file documenting achievements, techniques used, and lessons learned. Refactoring marked as complete in status.json."
       ]
     }
