@@ -583,6 +583,98 @@ foreach (var required in requiredTypes)
 }
 ```
 
+## Debug Logging
+
+The library includes a configurable DEBUG logging system (`DebugLogger`) that provides detailed insights into generation without cluttering test output.
+
+### Log Levels
+
+Use appropriate log levels for different types of information:
+
+```csharp
+// Verbose: Detailed operation logs (suppressed in tests by default)
+DebugLogger.LogVerbose(Component.AStar, $"Exploring node {nodeId}");
+
+// Info: Important milestones (shown by default)
+DebugLogger.LogInfo(Component.RoomPlacement, $"Placed room {roomId}");
+
+// Warn: Potential issues
+DebugLogger.LogWarn(Component.ConstraintEvaluation, "Constraint may be too restrictive");
+
+// Error: Actual problems (always shown)
+DebugLogger.LogError(Component.General, $"Generation failed: {ex.Message}");
+```
+
+### Enabling Verbose Logging
+
+By default, VERBOSE logs are suppressed in test contexts to reduce output noise. To enable them:
+
+**Via environment variable:**
+```bash
+# Enable all verbose logs
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+
+# Run your tests or application
+dotnet test
+```
+
+**Programmatically:**
+```csharp
+DebugLogger.SetLogLevel(DebugLogger.LogLevel.Verbose);
+```
+
+### Component Filtering
+
+Focus on specific components when debugging:
+
+```bash
+# Only see A* pathfinding logs
+export SHEPHERD_DEBUG_COMPONENTS=AStar
+
+# See multiple components
+export SHEPHERD_DEBUG_COMPONENTS=AStar,RoomPlacement,ConstraintEvaluation
+```
+
+**Programmatically:**
+```csharp
+// Enable only specific components
+DebugLogger.ResetConfiguration();
+DebugLogger.EnableComponent(Component.AStar);
+DebugLogger.EnableComponent(Component.RoomPlacement);
+```
+
+### Common Debugging Scenarios
+
+**Debugging A* pathfinding:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+export SHEPHERD_DEBUG_COMPONENTS=AStar
+```
+
+**Debugging constraint violations:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=INFO
+export SHEPHERD_DEBUG_COMPONENTS=ConstraintEvaluation
+```
+
+**Debugging room placement:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+export SHEPHERD_DEBUG_COMPONENTS=RoomPlacement
+```
+
+### Performance Considerations
+
+- **Zero overhead in RELEASE builds**: All logging methods are removed in release builds via `[Conditional("DEBUG")]`
+- **Fast-path optimization**: When verbose logging is disabled, `LogVerbose` returns immediately without string formatting
+- **Test context detection**: VERBOSE logs are automatically suppressed in test contexts to keep test output clean
+
+### Default Behavior
+
+- **In test contexts**: VERBOSE logs suppressed, INFO/WARN/ERROR shown
+- **In non-test contexts**: Default log level is INFO (VERBOSE suppressed, INFO/WARN/ERROR shown)
+- **All components enabled by default**: Unless `SHEPHERD_DEBUG_COMPONENTS` is set, all components log
+
 ## Next Steps
 
 - **[Examples](Examples)** - See best practices in action

@@ -408,6 +408,61 @@ HallwayMode = HallwayMode.AsNeeded
 
 ## Debugging Tips
 
+### Using DebugLogger for Troubleshooting
+
+The `DebugLogger` system provides detailed insights into generation without overwhelming output. Use it to diagnose issues:
+
+#### Enable Verbose Logging
+
+```bash
+# Enable all verbose logs to see detailed operations
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+dotnet test
+```
+
+#### Focus on Specific Components
+
+When debugging specific issues, filter to relevant components:
+
+**Constraint violations:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=INFO
+export SHEPHERD_DEBUG_COMPONENTS=ConstraintEvaluation
+```
+
+**Room placement failures:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+export SHEPHERD_DEBUG_COMPONENTS=RoomPlacement
+```
+
+**Hallway generation issues:**
+```bash
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+export SHEPHERD_DEBUG_COMPONENTS=HallwayGeneration,AStar
+```
+
+#### Programmatic Configuration
+
+For programmatic debugging in your code:
+
+```csharp
+// Enable verbose logging for specific components
+DebugLogger.SetLogLevel(DebugLogger.LogLevel.Verbose);
+DebugLogger.EnableComponent(Component.ConstraintEvaluation);
+DebugLogger.EnableComponent(Component.RoomPlacement);
+
+try
+{
+    var layout = generator.Generate(config);
+}
+finally
+{
+    // Reset to defaults after debugging
+    DebugLogger.ResetConfiguration();
+}
+```
+
 ### Enable Detailed Logging
 
 Add logging to see what's happening:
@@ -416,18 +471,35 @@ Add logging to see what's happening:
 try
 {
     var layout = generator.Generate(config);
-    Console.WriteLine($"Success: {layout.Rooms.Count} rooms");
+    DebugLogger.LogInfo(Component.General, $"Success: {layout.Rooms.Count} rooms");
 }
 catch (ConstraintViolationException ex)
 {
-    Console.WriteLine($"Constraint violation: {ex.Message}");
+    DebugLogger.LogError(Component.ConstraintEvaluation, $"Constraint violation: {ex.Message}");
     // Check your constraints and requirements
 }
 catch (SpatialPlacementException ex)
 {
-    Console.WriteLine($"Placement failed: {ex.Message}");
+    DebugLogger.LogError(Component.RoomPlacement, $"Placement failed: {ex.Message}");
     // Try smaller templates or enable hallways
 }
+```
+
+### Reducing Test Output Noise
+
+If test output is too verbose, VERBOSE logs are automatically suppressed in test contexts. To see them:
+
+```bash
+# Explicitly enable verbose logs in tests
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+dotnet test
+```
+
+To suppress all logs except errors:
+
+```bash
+export SHEPHERD_DEBUG_LEVEL=ERROR
+dotnet test
 ```
 
 ### Test Incrementally

@@ -17,10 +17,10 @@ internal static class DungeonDebugVisualizer
         int totalRooms) where TRoomType : Enum
     {
         var bounds = GetBounds(room.GetWorldCells());
-        Console.WriteLine($"[DEBUG] Placed Room {roomId} ({roomType}) at anchor {room.Position}");
-        Console.WriteLine($"[DEBUG]   Bounds: {bounds.min} to {bounds.max}");
-        Console.WriteLine($"[DEBUG]   Cells: {room.GetWorldCells().Count()}");
-        Console.WriteLine($"[DEBUG]   Progress: {totalRooms} rooms placed");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"Placed Room {roomId} ({roomType}) at anchor {room.Position}");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Bounds: {bounds.min} to {bounds.max}");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Cells: {room.GetWorldCells().Count()}");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Progress: {totalRooms} rooms placed");
     }
 
     public static void PrintSpatialLayout<TRoomType>(
@@ -29,15 +29,15 @@ internal static class DungeonDebugVisualizer
     {
         if (rooms.Count == 0) return;
 
-        Console.WriteLine($"\n[DEBUG] === {stage} ===");
-        Console.WriteLine($"[DEBUG] Total rooms placed: {rooms.Count}");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"\n=== {stage} ===");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"Total rooms placed: {rooms.Count}");
 
         var allCells = rooms.SelectMany(r => r.GetWorldCells()).ToList();
         var bounds = GetBounds(allCells);
         int width = bounds.max.X - bounds.min.X + 1;
         int height = bounds.max.Y - bounds.min.Y + 1;
 
-        Console.WriteLine($"[DEBUG] Overall bounds: {bounds.min} to {bounds.max} (size: {width}x{height})");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"Overall bounds: {bounds.min} to {bounds.max} (size: {width}x{height})");
 
         // Print each room's position
         foreach (var room in rooms.OrderBy(r => r.NodeId))
@@ -45,7 +45,7 @@ internal static class DungeonDebugVisualizer
             var roomBounds = GetBounds(room.GetWorldCells());
             int roomWidth = roomBounds.max.X - roomBounds.min.X + 1;
             int roomHeight = roomBounds.max.Y - roomBounds.min.Y + 1;
-            Console.WriteLine($"[DEBUG]   Room {room.NodeId} ({room.RoomType}): anchor={room.Position}, size={roomWidth}x{roomHeight}, bounds={roomBounds.min} to {roomBounds.max}");
+            DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Room {room.NodeId} ({room.RoomType}): anchor={room.Position}, size={roomWidth}x{roomHeight}, bounds={roomBounds.min} to {roomBounds.max}");
         }
     }
 
@@ -58,11 +58,11 @@ internal static class DungeonDebugVisualizer
         Cell end,
         int manhattanDistance)
     {
-        Console.WriteLine($"\n[DEBUG] === Hallway Generation: Room {roomAId} -> Room {roomBId} ===");
-        Console.WriteLine($"[DEBUG] Door A at: {doorA} (adjacent start: {start})");
-        Console.WriteLine($"[DEBUG] Door B at: {doorB} (adjacent end: {end})");
-        Console.WriteLine($"[DEBUG] Manhattan distance: {manhattanDistance} cells");
-        Console.WriteLine($"[DEBUG] Starting A* pathfinding...");
+        DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"\n=== Hallway Generation: Room {roomAId} -> Room {roomBId} ===");
+        DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"Door A at: {doorA} (adjacent start: {start})");
+        DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"Door B at: {doorB} (adjacent end: {end})");
+        DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"Manhattan distance: {manhattanDistance} cells");
+        DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"Starting A* pathfinding...");
     }
 
     public static void PrintAStarProgress(
@@ -75,7 +75,7 @@ internal static class DungeonDebugVisualizer
         if (nodesExplored % 1000 == 0) // Print every 1000 nodes to avoid spam
         {
             int remaining = Math.Abs(currentCell.X - targetCell.X) + Math.Abs(currentCell.Y - targetCell.Y);
-            Console.WriteLine($"[DEBUG]   A* Progress: explored={nodesExplored}, open={openSetSize}, closed={closedSetSize}, current={currentCell}, remaining={remaining}");
+            DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"  A* Progress: explored={nodesExplored}, open={openSetSize}, closed={closedSetSize}, current={currentCell}, remaining={remaining}");
         }
     }
 
@@ -88,11 +88,11 @@ internal static class DungeonDebugVisualizer
     {
         if (success)
         {
-            Console.WriteLine($"[DEBUG] ✓ A* found path: {pathLength} cells, explored {nodesExplored} nodes");
+            DebugLogger.LogInfo(DebugLogger.Component.AStar, $"✓ A* found path: {pathLength} cells, explored {nodesExplored} nodes");
         }
         else
         {
-            Console.WriteLine($"[DEBUG] ✗ A* failed: explored {nodesExplored} nodes, no path from {start} to {end}");
+            DebugLogger.LogWarn(DebugLogger.Component.AStar, $"✗ A* failed: explored {nodesExplored} nodes, no path from {start} to {end}");
         }
     }
 
@@ -157,10 +157,9 @@ internal static class DungeonDebugVisualizer
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"[DEBUG] ASCII Map ({width}x{height}):");
+        sb.AppendLine($"ASCII Map ({width}x{height}):");
         for (int y = 0; y < height; y++)
         {
-            sb.Append("[DEBUG] ");
             for (int x = 0; x < width; x++)
             {
                 sb.Append(map[x, y]);

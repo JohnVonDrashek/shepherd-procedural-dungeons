@@ -55,7 +55,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
             assignments[startNode.Id], 
             startRoom, 
             placedRooms.Count);
-        Console.WriteLine($"[DEBUG]   Placement: START ROOM at origin");
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, "  Placement: START ROOM at origin");
 #endif
 
         // 2. BFS from start, placing connected rooms
@@ -93,7 +93,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                         assignments[neighborId], 
                         neighborRoom, 
                         placedRooms.Count);
-                    Console.WriteLine($"[DEBUG]   Placement: ADJACENT to room {currentId}");
+                    DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Placement: ADJACENT to room {currentId}");
 #endif
                 }
                 else if (hallwayMode != HallwayMode.None)
@@ -115,8 +115,8 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                         assignments[neighborId], 
                         neighborRoom, 
                         placedRooms.Count);
-                    Console.WriteLine($"[DEBUG]   Placement: NEARBY (hallway required) to room {currentId}");
-                    Console.WriteLine($"[DEBUG]   Distance from room {currentId}: anchor={nearbyPlacement}, current room anchor={currentRoom.Position}");
+                    DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Placement: NEARBY (hallway required) to room {currentId}");
+                    DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, $"  Distance from room {currentId}: anchor={nearbyPlacement}, current room anchor={currentRoom.Position}");
 #endif
                 }
                 else
@@ -139,7 +139,8 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
 
 #if DEBUG
         DungeonDebugVisualizer.PrintSpatialLayout(placedRooms.Values.ToList(), "After Room Placement");
-        Console.WriteLine(DungeonDebugVisualizer.CreateAsciiMap(placedRooms.Values.ToList(), occupiedCells));
+        var asciiMap = DungeonDebugVisualizer.CreateAsciiMap(placedRooms.Values.ToList(), occupiedCells);
+        DebugLogger.LogInfo(DebugLogger.Component.RoomPlacement, asciiMap);
 #endif
 
         return placedRooms.Values.ToList();

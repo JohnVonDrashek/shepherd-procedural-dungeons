@@ -1483,6 +1483,206 @@ Deserializes a JSON string to `DungeonTheme`.
 **Exceptions:**
 - `InvalidConfigurationException` - Thrown when JSON is invalid or missing required fields
 
+## DebugLogger
+
+Configurable DEBUG logging system with log levels, component filtering, and test context detection. Provides zero-overhead logging when verbose logs are disabled.
+
+### Log Levels
+
+```csharp
+public enum LogLevel
+{
+    Verbose,  // Most verbose - detailed operation logs
+    Info,     // Informational messages
+    Warn,     // Warning messages
+    Error     // Error messages (cannot be suppressed)
+}
+```
+
+### Components
+
+```csharp
+public enum Component
+{
+    AStar,                // A* pathfinding algorithm logs
+    RoomPlacement,        // Room placement and spatial solving logs
+    HallwayGeneration,    // Hallway generation and connection logs
+    GraphGeneration,      // Graph algorithm execution logs
+    ConstraintEvaluation, // Constraint checking and validation logs
+    General               // General debug information
+}
+```
+
+### Static Methods
+
+#### LogVerbose
+
+```csharp
+[Conditional("DEBUG")]
+public static void LogVerbose(Component component, string message)
+```
+
+Logs a verbose message. Only outputs if VERBOSE level is enabled and component is enabled. Suppressed by default in test contexts.
+
+**Parameters:**
+- `component` - Component category for filtering
+- `message` - Log message
+
+#### LogInfo
+
+```csharp
+[Conditional("DEBUG")]
+public static void LogInfo(Component component, string message)
+```
+
+Logs an info message. Only outputs if INFO level or higher is enabled and component is enabled.
+
+**Parameters:**
+- `component` - Component category for filtering
+- `message` - Log message
+
+#### LogWarn
+
+```csharp
+[Conditional("DEBUG")]
+public static void LogWarn(Component component, string message)
+```
+
+Logs a warning message. Only outputs if WARN level or higher is enabled and component is enabled.
+
+**Parameters:**
+- `component` - Component category for filtering
+- `message` - Log message
+
+#### LogError
+
+```csharp
+[Conditional("DEBUG")]
+public static void LogError(Component component, string message)
+```
+
+Logs an error message. Always outputs if component is enabled (ERROR level cannot be suppressed).
+
+**Parameters:**
+- `component` - Component category for filtering
+- `message` - Log message
+
+#### SetLogLevel
+
+```csharp
+public static void SetLogLevel(LogLevel level)
+```
+
+Sets the current log level programmatically.
+
+**Parameters:**
+- `level` - Minimum log level to output
+
+#### EnableComponent
+
+```csharp
+public static void EnableComponent(Component component)
+```
+
+Enables logging for the specified component.
+
+**Parameters:**
+- `component` - Component to enable
+
+#### DisableComponent
+
+```csharp
+public static void DisableComponent(Component component)
+```
+
+Disables logging for the specified component.
+
+**Parameters:**
+- `component` - Component to disable
+
+#### ResetConfiguration
+
+```csharp
+public static void ResetConfiguration()
+```
+
+Resets the logger configuration to defaults. Used primarily for testing.
+
+### Properties
+
+#### IsTestContext
+
+```csharp
+public static bool IsTestContext { get; }
+```
+
+Gets whether the current execution context is a test context. Automatically detects test assemblies in the call stack or checks the `SHEPHERD_TEST_MODE` environment variable.
+
+### Environment Variables
+
+#### SHEPHERD_DEBUG_LEVEL
+
+Sets the minimum log level to output. Values: `Verbose`, `Info`, `Warn`, `Error` (case-insensitive).
+
+**Examples:**
+```bash
+# Enable all logs including verbose
+export SHEPHERD_DEBUG_LEVEL=VERBOSE
+
+# Only show warnings and errors
+export SHEPHERD_DEBUG_LEVEL=WARN
+```
+
+#### SHEPHERD_DEBUG_COMPONENTS
+
+Comma-separated list of components to enable. Only specified components will log. Values: `AStar`, `RoomPlacement`, `HallwayGeneration`, `GraphGeneration`, `ConstraintEvaluation`, `General` (case-insensitive).
+
+**Examples:**
+```bash
+# Only log A* pathfinding
+export SHEPHERD_DEBUG_COMPONENTS=AStar
+
+# Log multiple components
+export SHEPHERD_DEBUG_COMPONENTS=AStar,HallwayGeneration
+```
+
+#### SHEPHERD_TEST_MODE
+
+When set to `true`, enables test context detection (suppresses VERBOSE logs by default).
+
+**Example:**
+```bash
+export SHEPHERD_TEST_MODE=true
+```
+
+### Usage Examples
+
+```csharp
+// Verbose logging (suppressed in tests by default)
+DebugLogger.LogVerbose(Component.AStar, $"Exploring node {nodeId}");
+
+// Info logging (always shown unless level is WARN or ERROR)
+DebugLogger.LogInfo(Component.RoomPlacement, $"Placed room {roomId} at {position}");
+
+// Warning logging
+DebugLogger.LogWarn(Component.ConstraintEvaluation, $"Constraint may be too restrictive");
+
+// Error logging (always shown if component is enabled)
+DebugLogger.LogError(Component.General, $"Failed to place room: {ex.Message}");
+```
+
+### Performance
+
+- **Zero overhead in RELEASE builds**: All logging methods are marked with `[Conditional("DEBUG")]`, so they are completely removed in release builds.
+- **Fast-path optimization**: When verbose logging is disabled, `LogVerbose` returns immediately without any string formatting or component checks.
+- **Lazy evaluation**: Log messages are only formatted when the log level and component are actually enabled.
+
+### Default Behavior
+
+- **In test contexts**: VERBOSE logs are suppressed by default, INFO/WARN/ERROR logs are shown.
+- **In non-test contexts**: Default log level is INFO (VERBOSE suppressed, INFO/WARN/ERROR shown).
+- **All components enabled by default**: Unless `SHEPHERD_DEBUG_COMPONENTS` is set, all components log.
+
 ## Namespaces
 
 - `ShepherdProceduralDungeons` - Main entry point

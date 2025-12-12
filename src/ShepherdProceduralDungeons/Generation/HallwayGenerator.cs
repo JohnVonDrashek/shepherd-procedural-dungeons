@@ -102,7 +102,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             var segments = PathToSegments(path);
             
 #if DEBUG
-            Console.WriteLine($"[DEBUG] ✓ Hallway generated: {path.Count} cells");
+            DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"✓ Hallway generated: {path.Count} cells");
 #endif
 
             var hallway = new Hallway
@@ -199,7 +199,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             if (alternativeStart.HasValue)
             {
 #if DEBUG
-                Console.WriteLine($"[DEBUG] Start cell {start} is occupied, using alternative start: {alternativeStart.Value}");
+                DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"Start cell {start} is occupied, using alternative start: {alternativeStart.Value}");
 #endif
                 start = alternativeStart.Value;
             }
@@ -223,7 +223,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             if (alternativeEnd.HasValue)
             {
 #if DEBUG
-                Console.WriteLine($"[DEBUG] End cell {end} is occupied, using alternative end: {alternativeEnd.Value}");
+                DebugLogger.LogInfo(DebugLogger.Component.HallwayGeneration, $"End cell {end} is occupied, using alternative end: {alternativeEnd.Value}");
 #endif
                 end = alternativeEnd.Value;
             }
@@ -293,7 +293,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
     private IReadOnlyList<Cell>? AStar(Cell start, Cell end, HashSet<Cell> occupied)
     {
 #if DEBUG
-        Console.WriteLine($"[DEBUG] A* called: start={start}, end={end}, startOccupied={occupied.Contains(start)}, endOccupied={occupied.Contains(end)}");
+        DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"A* called: start={start}, end={end}, startOccupied={occupied.Contains(start)}, endOccupied={occupied.Contains(end)}");
 #endif
         var openSet = new PriorityQueue<Cell, int>();
         var closedSet = new HashSet<Cell>();
@@ -305,7 +305,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         int nodesExplored = 0;
 #if DEBUG
         int lastReport = 0;
-        Console.WriteLine($"[DEBUG] A* initialized: openSet.Count={openSet.Count}, startPriority={ManhattanDistance(start, end)}");
+        DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"A* initialized: openSet.Count={openSet.Count}, startPriority={ManhattanDistance(start, end)}");
 #endif
 
         // Limit exploration to prevent infinite loops
@@ -318,7 +318,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         {
 #if DEBUG
             if (nodesExplored == 0)
-                Console.WriteLine($"[DEBUG] A* entering while loop, openSet.Count={openSet.Count}");
+                DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"A* entering while loop, openSet.Count={openSet.Count}");
 #endif
             var current = openSet.Dequeue();
 
@@ -326,7 +326,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             {
 #if DEBUG
                 if (nodesExplored < 10)
-                    Console.WriteLine($"[DEBUG] A* skipping already-closed cell: {current}");
+                    DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"A* skipping already-closed cell: {current}");
 #endif
                 continue;
             }
@@ -335,7 +335,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             
 #if DEBUG
             nodesExplored++;
-            Console.WriteLine($"[DEBUG] A* exploring node {nodesExplored}: {current}, openSet={openSet.Count}, closedSet={closedSet.Count}");
+            DebugLogger.LogVerbose(DebugLogger.Component.AStar, $"A* exploring node {nodesExplored}: {current}, openSet={openSet.Count}, closedSet={closedSet.Count}");
             if (nodesExplored - lastReport >= 500 || nodesExplored == 1) // Report every 500 or first
             {
                 lastReport = nodesExplored;
@@ -354,7 +354,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
             if (nodesExplored >= maxNodesExplored)
             {
 #if DEBUG
-                Console.WriteLine($"[DEBUG] A* reached max exploration limit ({maxNodesExplored} nodes), aborting");
+                DebugLogger.LogWarn(DebugLogger.Component.AStar, $"A* reached max exploration limit ({maxNodesExplored} nodes), aborting");
                 DungeonDebugVisualizer.PrintAStarComplete(false, nodesExplored, 0, start, end);
 #endif
                 return null;
@@ -398,7 +398,7 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
                     pathList.Add(start);
                     
 #if DEBUG
-                    Console.WriteLine($"[DEBUG] WARNING: A* path reconstruction didn't reach start via cameFrom chain. " +
+                    DebugLogger.LogWarn(DebugLogger.Component.AStar, $"WARNING: A* path reconstruction didn't reach start via cameFrom chain. " +
                         $"Start: {start}, End: {end}, Path length before adding start: {pathList.Count - 1}");
 #endif
                 }
