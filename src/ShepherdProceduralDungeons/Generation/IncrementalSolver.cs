@@ -213,16 +213,16 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         // Leave gap of 1-3 cells for hallway
         int maxRadius = 20;
 
+        // Calculate bounding box ONCE before the loop (optimization: OPT-004)
+        var existingCells = existingRoom.GetWorldCells().ToList();
+        int minX = existingCells.Min(c => c.X);
+        int maxX = existingCells.Max(c => c.X);
+        int minY = existingCells.Min(c => c.Y);
+        int maxY = existingCells.Max(c => c.Y);
+
         for (int radius = 2; radius <= maxRadius; radius++)
         {
             var candidates = new List<Cell>();
-
-            // Check cells at this radius
-            var existingCells = existingRoom.GetWorldCells().ToList();
-            int minX = existingCells.Min(c => c.X);
-            int maxX = existingCells.Max(c => c.X);
-            int minY = existingCells.Min(c => c.Y);
-            int maxY = existingCells.Max(c => c.Y);
 
             // Search around the bounding box
             for (int dx = -radius; dx <= radius; dx++)

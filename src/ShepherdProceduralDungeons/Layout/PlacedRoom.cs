@@ -34,11 +34,23 @@ public sealed class PlacedRoom<TRoomType> where TRoomType : Enum
     /// </summary>
     public required double Difficulty { get; init; }
 
+    // Cached world cells (lazy-initialized) - optimization: OPT-005
+    private IReadOnlyList<Cell>? _cachedWorldCells;
+
     /// <summary>
     /// Gets all cells this room occupies in world coordinates.
     /// </summary>
-    public IEnumerable<Cell> GetWorldCells() =>
-        Template.Cells.Select(c => new Cell(Position.X + c.X, Position.Y + c.Y));
+    public IEnumerable<Cell> GetWorldCells()
+    {
+        if (_cachedWorldCells == null)
+        {
+            _cachedWorldCells = Template.Cells
+                .Select(c => new Cell(Position.X + c.X, Position.Y + c.Y))
+                .ToList();
+        }
+        
+        return _cachedWorldCells;
+    }
 
     /// <summary>
     /// Gets all exterior edges in world coordinates.

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ShepherdProceduralDungeons.Benchmarks.SpatialPlacementBoundingBoxOptimizationBenchmark-20251212-143951</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.2 (24G325) [Darwin 24.6.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.100
+  [Host]     : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                         </th><th>maxRadius</th><th>placementCount</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>PlaceNearbySmallRoom</td><td>?</td><td>?</td><td>1.706 &mu;s</td><td>0.0052 &mu;s</td><td>0.0049 &mu;s</td><td>1.00</td><td>0.00</td><td>0.3738</td><td>-</td><td>-</td><td>3.06 KB</td><td>1.00</td>
+</tr><tr><td>PlaceNearbyMediumRoom</td><td>?</td><td>?</td><td>8.510 &mu;s</td><td>0.0561 &mu;s</td><td>0.0525 &mu;s</td><td>4.99</td><td>0.04</td><td>0.9155</td><td>-</td><td>-</td><td>7.6 KB</td><td>2.48</td>
+</tr><tr><td>PlaceNearbyLargeRoom</td><td>?</td><td>?</td><td>86.711 &mu;s</td><td>0.5531 &mu;s</td><td>0.5174 &mu;s</td><td>50.84</td><td>0.39</td><td>3.4180</td><td>-</td><td>-</td><td>28.78 KB</td><td>9.40</td>
+</tr><tr><td>PlaceNearbyMemoryAllocations</td><td>?</td><td>?</td><td>174.794 &mu;s</td><td>2.7290 &mu;s</td><td>2.4191 &mu;s</td><td>102.50</td><td>1.26</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>9.55 KB</td><td>3.12</td>
+</tr><tr><td>PlaceNearbyWithRadius</td><td>5</td><td>?</td><td>41.976 &mu;s</td><td>0.1653 &mu;s</td><td>0.1546 &mu;s</td><td>?</td><td>?</td><td>5.0659</td><td>-</td><td>-</td><td>41.56 KB</td><td>?</td>
+</tr><tr><td>EndToEndSpatialSolverNearbyPlacements</td><td>?</td><td>5</td><td>51.830 &mu;s</td><td>0.2559 &mu;s</td><td>0.2394 &mu;s</td><td>?</td><td>?</td><td>4.3945</td><td>-</td><td>-</td><td>36.29 KB</td><td>?</td>
+</tr><tr><td>PlaceNearbyWithRadius</td><td>10</td><td>?</td><td>39.275 &mu;s</td><td>0.2744 &mu;s</td><td>0.2566 &mu;s</td><td>?</td><td>?</td><td>5.0659</td><td>-</td><td>-</td><td>41.56 KB</td><td>?</td>
+</tr><tr><td>EndToEndSpatialSolverNearbyPlacements</td><td>?</td><td>10</td><td>93.675 &mu;s</td><td>0.7971 &mu;s</td><td>0.7456 &mu;s</td><td>?</td><td>?</td><td>8.7891</td><td>-</td><td>-</td><td>71.85 KB</td><td>?</td>
+</tr><tr><td>PlaceNearbyWithRadius</td><td>20</td><td>?</td><td>43.116 &mu;s</td><td>0.0504 &mu;s</td><td>0.0471 &mu;s</td><td>?</td><td>?</td><td>5.0659</td><td>-</td><td>-</td><td>41.56 KB</td><td>?</td>
+</tr><tr><td>EndToEndSpatialSolverNearbyPlacements</td><td>?</td><td>20</td><td>181.827 &mu;s</td><td>0.8278 &mu;s</td><td>0.7744 &mu;s</td><td>?</td><td>?</td><td>17.3340</td><td>-</td><td>-</td><td>143.06 KB</td><td>?</td>
+</tr></tbody></table>
+</body>
+</html>

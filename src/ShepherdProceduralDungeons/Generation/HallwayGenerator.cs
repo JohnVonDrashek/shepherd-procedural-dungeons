@@ -27,27 +27,36 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         // Create room lookup dictionary for O(1) lookups
         var roomLookup = rooms.ToDictionary(r => r.NodeId, r => r);
 
+        // Cache exterior edges for all rooms (optimization: OPT-006)
+        var edgeCache = new Dictionary<int, IReadOnlyList<(Cell LocalCell, Cell WorldCell, Edge Edge)>>();
+        foreach (var room in rooms)
+        {
+            edgeCache[room.NodeId] = room.GetExteriorEdgesWorld().ToList();
+        }
+
         foreach (var conn in graph.Connections.Where(c => c.RequiresHallway))
         {
             var roomA = roomLookup[conn.NodeAId];
             var roomB = roomLookup[conn.NodeBId];
 
-            // Get all possible door positions on each room
-            var doorsA = roomA.GetExteriorEdgesWorld()
+            // Get all possible door positions on each room (using cached edges)
+            var edgesA = edgeCache[roomA.NodeId];
+            var doorsA = edgesA
                 .Where(e => roomA.Template.CanPlaceDoor(e.LocalCell, e.Edge))
                 .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
                 .ToList();
             
-            var doorsB = roomB.GetExteriorEdgesWorld()
+            var edgesB = edgeCache[roomB.NodeId];
+            var doorsB = edgesB
                 .Where(e => roomB.Template.CanPlaceDoor(e.LocalCell, e.Edge))
                 .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
                 .ToList();
 
             if (doorsA.Count == 0 || doorsB.Count == 0)
             {
-                // Fallback: use any exterior edge
-                var fallbackA = roomA.GetExteriorEdgesWorld().First();
-                var fallbackB = roomB.GetExteriorEdgesWorld().First();
+                // Fallback: use any exterior edge (using cached edges)
+                var fallbackA = edgesA.First();
+                var fallbackB = edgesB.First();
                 doorsA = new List<(Cell WorldCell, Edge Edge)> { (fallbackA.WorldCell, fallbackA.Edge) };
                 doorsB = new List<(Cell WorldCell, Edge Edge)> { (fallbackB.WorldCell, fallbackB.Edge) };
             }
@@ -145,24 +154,27 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
     private ((Cell WorldCell, Edge Edge) DoorA, (Cell WorldCell, Edge Edge) DoorB) FindBestDoorPair(
         PlacedRoom<TRoomType> roomA,
         PlacedRoom<TRoomType> roomB,
+        IReadOnlyDictionary<int, IReadOnlyList<(Cell LocalCell, Cell WorldCell, Edge Edge)>> edgeCache,
         Random rng)
     {
-        // Get all possible door positions from both rooms
-        var doorsA = roomA.GetExteriorEdgesWorld()
+        // Get all possible door positions from both rooms (using cached edges)
+        var edgesA = edgeCache[roomA.NodeId];
+        var doorsA = edgesA
             .Where(e => roomA.Template.CanPlaceDoor(e.LocalCell, e.Edge))
             .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
             .ToList();
 
-        var doorsB = roomB.GetExteriorEdgesWorld()
+        var edgesB = edgeCache[roomB.NodeId];
+        var doorsB = edgesB
             .Where(e => roomB.Template.CanPlaceDoor(e.LocalCell, e.Edge))
             .Select(e => (WorldCell: e.WorldCell, Edge: e.Edge))
             .ToList();
 
         if (doorsA.Count == 0 || doorsB.Count == 0)
         {
-            // Fallback: use any exterior edge
-            var fallbackA = roomA.GetExteriorEdgesWorld().First();
-            var fallbackB = roomB.GetExteriorEdgesWorld().First();
+            // Fallback: use any exterior edge (using cached edges)
+            var fallbackA = edgesA.First();
+            var fallbackB = edgesB.First();
             return ((fallbackA.WorldCell, fallbackA.Edge), (fallbackB.WorldCell, fallbackB.Edge));
         }
 
