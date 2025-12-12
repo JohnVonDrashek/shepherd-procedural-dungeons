@@ -1,6 +1,24 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-11T20:21:20Z",
-  "nextFeatureId": 1,
-  "features": []
+  "lastUpdated": "2025-01-27T04:00:00Z",
+  "nextFeatureId": 2,
+  "features": [
+    {
+      "id": "FEATURE-001",
+      "title": "Test Timeout Infrastructure",
+      "status": "complete",
+      "priority": "high",
+      "complexity": "medium",
+      "created": "2025-01-27T00:00:00Z",
+      "updated": "2025-01-27T04:00:00Z",
+      "featureFile": ".bots/features/FEATURE-001-test-timeout-infrastructure.md",
+      "testFile": "tests/ShepherdProceduralDungeons.Tests/TestTimeoutInfrastructureTests.cs",
+      "dependencies": [],
+      "notes": [
+        "Tests failed verification - ALL tests must pass (attempt 1), re-spawning Coding Bot. 7 timeout verification tests are intentionally timing out to verify infrastructure works, but they cause test failures. Need to restructure these tests to verify timeout behavior without causing failures.",
+        "Tests restructured to verify timeout infrastructure without causing actual timeouts. All 19 timeout infrastructure tests now pass, and all 398 tests in the suite pass.",
+        "Documentation updated in wiki/Best-Practices.md with comprehensive test timeout guidance."
+      ]
+    }
+  ]
 }

@@ -44,5 +44,49 @@ public static class TestHelpers
                 .Build()
         };
     }
+
+    /// <summary>
+    /// Timeout constants for different test categories.
+    /// </summary>
+    public static class Timeout
+    {
+        /// <summary>
+        /// Default timeout for unit tests (5 seconds).
+        /// </summary>
+        public const int UnitTestMs = 5000;
+
+        /// <summary>
+        /// Default timeout for integration tests (30 seconds).
+        /// </summary>
+        public const int IntegrationTestMs = 30000;
+
+        /// <summary>
+        /// Default timeout for performance tests (60 seconds).
+        /// </summary>
+        public const int PerformanceTestMs = 60000;
+
+        /// <summary>
+        /// Global default timeout for tests without explicit timeout (30 seconds).
+        /// </summary>
+        public const int DefaultMs = 30000;
+    }
+
+    /// <summary>
+    /// Helper method to get the appropriate timeout for integration tests.
+    /// </summary>
+    /// <returns>The timeout value in milliseconds for integration tests.</returns>
+    public static int GetIntegrationTestTimeout()
+    {
+        return Timeout.IntegrationTestMs;
+    }
+
+    /// <summary>
+    /// Helper method to get the appropriate timeout for unit tests.
+    /// </summary>
+    /// <returns>The timeout value in milliseconds for unit tests.</returns>
+    public static int GetUnitTestTimeout()
+    {
+        return Timeout.UnitTestMs;
+    }
 }
 

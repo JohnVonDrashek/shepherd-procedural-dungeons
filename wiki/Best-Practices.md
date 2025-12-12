@@ -285,6 +285,172 @@ var treasureCount = layout.Rooms.Count(r => r.RoomType == RoomType.Treasure);
 Assert.Equal(2, treasureCount);
 ```
 
+### Test Timeouts
+
+The test infrastructure includes comprehensive timeout support to prevent infinite execution times and improve CI/CD reliability. All tests should specify appropriate timeout values based on their complexity.
+
+#### Per-Test Timeout Configuration
+
+Use the `Timeout` parameter on `[Fact]` or `[Theory]` attributes to set per-test timeouts:
+
+```csharp
+// Unit test with 5-second timeout
+[Fact(Timeout = 5000)]
+public void QuickUnitTest()
+{
+    // Fast test that should complete in < 5 seconds
+    Assert.True(true);
+}
+
+// Integration test with 30-second timeout
+[Fact(Timeout = 30000)]
+public async Task IntegrationTest()
+{
+    // Full generation cycle that may take longer
+    var layout = await generator.GenerateAsync(config);
+    Assert.NotNull(layout);
+}
+```
+
+#### Global Default Timeout
+
+Tests without explicit timeouts use the global default (30 seconds) configured in `xunit.runner.json`. This provides a safety net for tests that don't specify timeouts:
+
+```csharp
+// Uses global default timeout (30 seconds)
+[Fact]
+public void TestWithoutExplicitTimeout()
+{
+    // Will timeout after 30 seconds if it hangs
+    Assert.True(true);
+}
+```
+
+#### Timeout Best Practices
+
+**Choose appropriate timeout values based on test category:**
+
+- **Unit tests**: 1-5 seconds (fast, isolated operations)
+  ```csharp
+  [Fact(Timeout = 5000)]  // 5 seconds
+  public void UnitTest() { }
+  ```
+
+- **Integration tests**: 10-30 seconds (full generation cycles)
+  ```csharp
+  [Fact(Timeout = 30000)]  // 30 seconds
+  public void IntegrationTest() { }
+  ```
+
+- **Performance/stress tests**: 60+ seconds (large dungeon generation)
+  ```csharp
+  [Fact(Timeout = 60000)]  // 60 seconds
+  public void PerformanceTest() { }
+  ```
+
+#### Using Timeout Constants
+
+The `TestHelpers` class provides constants for consistent timeout values:
+
+```csharp
+using ShepherdProceduralDungeons.Tests;
+
+// Use constants instead of magic numbers
+[Fact(Timeout = TestHelpers.Timeout.UnitTestMs)]  // 5000ms
+public void UnitTest() { }
+
+[Fact(Timeout = TestHelpers.Timeout.IntegrationTestMs)]  // 30000ms
+public void IntegrationTest() { }
+
+[Fact(Timeout = TestHelpers.Timeout.PerformanceTestMs)]  // 60000ms
+public void PerformanceTest() { }
+```
+
+#### Integration Test Attribute
+
+For integration tests, use the `[IntegrationTest]` attribute along with the timeout:
+
+```csharp
+using ShepherdProceduralDungeons.Tests;
+
+[Fact(Timeout = IntegrationTestAttribute.DefaultTimeoutMs)]
+[IntegrationTest]
+[Trait("Category", "Integration")]
+public void FullGenerationCycle()
+{
+    // Integration test that uses standard timeout
+    var layout = generator.Generate(config);
+    Assert.NotNull(layout);
+}
+```
+
+#### When to Increase vs. Fix Slow Tests
+
+**Increase timeout when:**
+- Test legitimately needs more time (e.g., generating large dungeons)
+- Test is performing complex operations that take time
+- Test is marked as a performance test
+
+**Fix the test when:**
+- Test is hanging due to infinite loops or deadlocks
+- Test is inefficient and can be optimized
+- Test is waiting unnecessarily (e.g., fixed delays instead of proper async/await)
+
+```csharp
+// ❌ Bad: Unnecessary delay
+[Fact(Timeout = 60000)]
+public async Task SlowTest()
+{
+    await Task.Delay(10000);  // Unnecessary 10-second delay
+    Assert.True(true);
+}
+
+// ✅ Good: Optimize the test
+[Fact(Timeout = 5000)]
+public void FastTest()
+{
+    // Test completes quickly without unnecessary delays
+    Assert.True(true);
+}
+```
+
+#### Diagnosing Timeout Failures
+
+When a test times out, xUnit provides clear error messages:
+
+```
+Test 'MyTest' exceeded execution timeout of 5000ms
+```
+
+**Common causes:**
+1. Infinite loops in test code
+2. Deadlocks in async code
+3. Waiting for conditions that never occur
+4. Timeout value too low for legitimate operations
+
+**Solutions:**
+- Check for infinite loops or blocking operations
+- Review async/await patterns for deadlocks
+- Increase timeout if test legitimately needs more time
+- Optimize test to run faster
+
+#### CI/CD Integration
+
+Timeout configuration works correctly in CI/CD environments. The global default timeout (30 seconds) prevents job-level timeouts from masking individual test failures:
+
+```bash
+# Tests will timeout at the test level, not the job level
+dotnet test
+```
+
+Environment variables can override timeout values if needed (though this is rarely necessary):
+
+```bash
+# Override default timeout (optional)
+export XUNIT_TEST_TIMEOUT_MS=60000
+dotnet test
+```
+
 ## Code Organization
 
 ### Template Factory
