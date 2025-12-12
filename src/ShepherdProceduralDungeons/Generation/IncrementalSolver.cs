@@ -1,4 +1,5 @@
 using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
 using ShepherdProceduralDungeons.Exceptions;
 using ShepherdProceduralDungeons.Graph;
 using ShepherdProceduralDungeons.Layout;
@@ -33,7 +34,8 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         IReadOnlyDictionary<int, TRoomType> assignments,
         IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates,
         HallwayMode hallwayMode,
-        Random rng)
+        Random rng,
+        IReadOnlyList<IConstraint<TRoomType>>? constraints = null)
     {
         _graph = graph;
         var placedRooms = new Dictionary<int, PlacedRoom<TRoomType>>();
@@ -78,7 +80,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 var neighborTemplate = SelectTemplateWithZone(assignments[neighborId], templates, rng, neighborId);
 
                 // Try to place adjacent to current room
-                var placement = TryPlaceAdjacent(currentRoom, neighborTemplate, occupiedCells, rng);
+                var placement = TryPlaceAdjacent(currentRoom, neighborTemplate, occupiedCells, rng, constraints, placedRooms.Values.ToList(), graph, assignments, assignments[neighborId]);
 
                 if (placement.HasValue)
                 {
@@ -99,7 +101,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 else if (hallwayMode != HallwayMode.None)
                 {
                     // Place nearby with gap for hallway
-                    var nearbyPlacement = PlaceNearby(currentRoom, neighborTemplate, occupiedCells, rng);
+                    var nearbyPlacement = PlaceNearby(currentRoom, neighborTemplate, occupiedCells, rng, constraints, placedRooms.Values.ToList(), graph, assignments, assignments[neighborId]);
                     var neighborNode = graph.GetNode(neighborId);
                     var neighborRoom = PlaceRoom(neighborId, neighborTemplate, nearbyPlacement, assignments[neighborId], neighborNode.Difficulty);
                     placedRooms[neighborId] = neighborRoom;
@@ -146,7 +148,16 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         return placedRooms.Values.ToList();
     }
 
-    private Cell? TryPlaceAdjacent(PlacedRoom<TRoomType> existingRoom, RoomTemplate<TRoomType> template, HashSet<Cell> occupied, Random rng)
+    private Cell? TryPlaceAdjacent(
+        PlacedRoom<TRoomType> existingRoom,
+        RoomTemplate<TRoomType> template,
+        HashSet<Cell> occupied,
+        Random rng,
+        IReadOnlyList<IConstraint<TRoomType>>? constraints,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments,
+        TRoomType roomType)
     {
         // Get all exterior edges of existing room
         var existingExterior = existingRoom.GetExteriorEdgesWorld().ToList();
@@ -182,7 +193,11 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 // Check if template fits without overlap
                 if (TemplateFits(template, templateAnchor, occupied))
                 {
-                    return templateAnchor;
+                    // Check spatial constraints
+                    if (CheckSpatialConstraints(templateAnchor, template, placedRooms, graph, assignments, constraints, roomType))
+                    {
+                        return templateAnchor;
+                    }
                 }
             }
         }
@@ -207,7 +222,16 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         return offset;
     }
 
-    private Cell PlaceNearby(PlacedRoom<TRoomType> existingRoom, RoomTemplate<TRoomType> template, HashSet<Cell> occupied, Random rng)
+    private Cell PlaceNearby(
+        PlacedRoom<TRoomType> existingRoom,
+        RoomTemplate<TRoomType> template,
+        HashSet<Cell> occupied,
+        Random rng,
+        IReadOnlyList<IConstraint<TRoomType>>? constraints,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments,
+        TRoomType roomType)
     {
         // Search in expanding radius for valid placement
         // Leave gap of 1-3 cells for hallway
@@ -234,7 +258,11 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                     Cell anchor = new Cell(minX + dx, minY + dy);
                     if (TemplateFits(template, anchor, occupied))
                     {
-                        candidates.Add(anchor);
+                        // Check spatial constraints
+                        if (CheckSpatialConstraints(anchor, template, placedRooms, graph, assignments, constraints, roomType))
+                        {
+                            candidates.Add(anchor);
+                        }
                     }
                 }
             }
@@ -399,6 +427,42 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         {
             occupied.Add(cell);
         }
+    }
+
+    private bool CheckSpatialConstraints(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> template,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments,
+        IReadOnlyList<IConstraint<TRoomType>>? constraints,
+        TRoomType roomType)
+    {
+        if (constraints == null || constraints.Count == 0)
+        {
+            return true;
+        }
+
+        // Check all spatial constraints that apply to this room type
+        foreach (var constraint in constraints)
+        {
+            // Only check constraints that target this room type
+            if (!constraint.TargetRoomType.Equals(roomType))
+            {
+                continue;
+            }
+
+            // Check if constraint is spatial
+            if (constraint is ISpatialConstraint<TRoomType> spatialConstraint)
+            {
+                if (!spatialConstraint.IsValidSpatially(proposedPosition, template, placedRooms, graph, assignments))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
 }

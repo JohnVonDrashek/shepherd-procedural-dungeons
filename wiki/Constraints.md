@@ -1392,6 +1392,399 @@ var layout = generator.Generate(config);
 
 Zone-aware constraints work without zones too - they simply allow all placements when zones aren't configured, ensuring backward compatibility.
 
+## Spatial Constraints
+
+Spatial constraints control room placement based on **actual 2D spatial positions** rather than graph topology. They enable powerful dungeon design patterns like clustering rooms in specific regions, placing rooms in quadrants, enforcing spatial proximity/distance rules, and creating thematic spatial zones.
+
+**Key concepts:**
+- Spatial constraints are evaluated during the **spatial placement phase** (after room type assignment)
+- Spatial constraints work alongside graph constraints - **both must pass** for a room to be placed
+- Spatial constraints use **Manhattan distance** (sum of X and Y differences) for distance calculations
+- Spatial constraints can be combined with graph constraints using `CompositeConstraint`
+
+**When to use spatial constraints:**
+- **Spatial clustering**: Place all shops in a "bazaar" area, all combat rooms in a "gauntlet" region
+- **Quadrant-based placement**: Ensure boss rooms are in the center, spawn rooms in a corner
+- **Spatial proximity rules**: Require certain room types to be within N cells of each other in 2D space
+- **Thematic spatial zones**: Create visual/thematic regions (e.g., "northern fortress", "southern crypts")
+- **Layout control**: Design dungeons with specific spatial patterns that complement graph topology
+
+**Important:** Spatial constraints operate on **2D spatial coordinates** (Cell positions), not graph distance. A room can be spatially close but graph-distant, or vice versa.
+
+### MustBeInQuadrantConstraint
+
+Requires a room to be placed in a specific quadrant of the dungeon. Quadrants are determined relative to the dungeon's bounding box.
+
+```csharp
+// Single quadrant
+new MustBeInQuadrantConstraint<RoomType>(
+    RoomType.Shop,
+    Quadrant.TopRight
+)
+
+// Multiple quadrants (using flags)
+new MustBeInQuadrantConstraint<RoomType>(
+    RoomType.Boss,
+    Quadrant.TopLeft | Quadrant.TopRight  // Can be in either top quadrant
+)
+
+// Center quadrant
+new MustBeInQuadrantConstraint<RoomType>(
+    RoomType.Boss,
+    Quadrant.Center
+)
+```
+
+**Use case:** Create thematic regions like "bazaar area" (shops in top-right), "boss arena" (boss in center), or "spawn zone" (spawn in corner).
+
+**Example:**
+```csharp
+// All shops must be in top-right quadrant (bazaar area)
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Shop, Quadrant.TopRight)
+
+// Boss room must be in center quadrant
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Boss, Quadrant.Center)
+
+// Secret rooms can be in any corner (top-left, top-right, bottom-left, or bottom-right)
+new MustBeInQuadrantConstraint<RoomType>(
+    RoomType.Secret,
+    Quadrant.TopLeft | Quadrant.TopRight | Quadrant.BottomLeft | Quadrant.BottomRight
+)
+```
+
+**Behavior:**
+- Quadrants are calculated relative to the dungeon's bounding box (all placed rooms)
+- Center quadrant is within 5 cells of the dungeon center
+- First room can be placed anywhere (no bounds to calculate)
+- Uses room center (average of all room cells) to determine quadrant
+
+**Quadrant enum values:**
+- `Quadrant.TopLeft` - Negative X, negative Y relative to center
+- `Quadrant.TopRight` - Positive X, negative Y relative to center
+- `Quadrant.BottomLeft` - Negative X, positive Y relative to center
+- `Quadrant.BottomRight` - Positive X, positive Y relative to center
+- `Quadrant.Center` - Within 5 cells of dungeon center
+
+### MinSpatialDistanceFromRoomTypeConstraint
+
+Requires a room to be at least N cells away from rooms of specified type(s) in 2D space (spatial distance, not graph distance).
+
+```csharp
+// Single reference type
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Treasure,
+    RoomType.Boss,
+    minDistance: 10
+)
+
+// Multiple reference types (at least N cells from ANY of these)
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Secret,
+    minDistance: 8,
+    RoomType.Boss,
+    RoomType.Combat
+)
+```
+
+**Use case:** Create separation between room types in 2D space. Common scenarios include:
+- Treasure rooms should be hidden away from boss rooms (spatial distance)
+- Secret rooms should be separated from spawn rooms
+- Special rooms should maintain minimum spatial distance from each other
+
+**Important:** This constraint uses **spatial distance** (Manhattan distance in cells), not graph distance. A room can be spatially far but graph-close, or vice versa.
+
+**Example:**
+```csharp
+// Treasure rooms must be at least 10 cells from Boss rooms (spatial distance)
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Treasure, RoomType.Boss, 10)
+
+// Secret rooms must be at least 8 cells from Boss OR Combat rooms
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Secret,
+    8,
+    RoomType.Boss,
+    RoomType.Combat
+)
+```
+
+**Behavior:**
+- Calculates minimum distance from any cell of this room to any cell of reference rooms
+- Uses Manhattan distance (|x1-x2| + |y1-y2|)
+- Returns `true` if minimum distance >= minDistance
+- Returns `true` if no reference rooms exist yet (permissive during early placement)
+
+### MaxSpatialDistanceFromRoomTypeConstraint
+
+Requires a room to be within N cells of rooms of specified type(s) in 2D space (spatial distance, not graph distance).
+
+```csharp
+// Single reference type
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Secret,
+    RoomType.Boss,
+    maxDistance: 5
+)
+
+// Multiple reference types (within N cells of ANY of these)
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Shop,
+    maxDistance: 6,
+    RoomType.Combat,
+    RoomType.Boss
+)
+```
+
+**Use case:** Ensure spatial proximity between room types. Common scenarios include:
+- Secret rooms should be near boss rooms (spatial proximity)
+- Shop rooms should be conveniently located near combat areas
+- Special rooms should be within reach of key areas
+
+**Important:** This constraint uses **spatial distance** (Manhattan distance in cells), not graph distance.
+
+**Example:**
+```csharp
+// Secret rooms must be within 5 cells of Boss room (spatial proximity)
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 5)
+
+// Shop rooms must be within 6 cells of Combat OR Boss rooms
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(
+    RoomType.Shop,
+    6,
+    RoomType.Combat,
+    RoomType.Boss
+)
+```
+
+**Behavior:**
+- Calculates minimum distance from any cell of this room to any cell of reference rooms
+- Uses Manhattan distance (|x1-x2| + |y1-y2|)
+- Returns `true` if minimum distance <= maxDistance
+- Returns `true` if no reference rooms exist yet (permissive during early placement)
+
+### MustFormSpatialClusterConstraint
+
+Requires rooms of a type to form a spatial cluster (all within clusterRadius of each other).
+
+```csharp
+new MustFormSpatialClusterConstraint<RoomType>(
+    RoomType.Shop,
+    clusterRadius: 5,
+    minClusterSize: 3
+)
+```
+
+**Use case:** Ensure room types form spatial clusters for gameplay mechanics. Common scenarios include:
+- Shops must cluster together (bazaar areas)
+- Combat rooms must cluster (gauntlet areas)
+- Treasure rooms must cluster (treasure vaults)
+
+**Example:**
+```csharp
+// Combat rooms must form a spatial cluster (all within 5 cells of each other, minimum 3 rooms)
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Combat, 5, 3)
+
+// Shops must form a bazaar (all within 8 cells, minimum 2 shops)
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Shop, 8, 2)
+```
+
+**Behavior:**
+- First room of type is always valid (no existing cluster to check)
+- Subsequent rooms must be within clusterRadius of at least one existing room of the same type
+- Validates that all rooms of this type form a connected spatial cluster
+- Uses Manhattan distance for cluster radius calculation
+
+### MustBeInRegionConstraint
+
+Requires a room to be placed within a defined rectangular region (min/max X/Y bounds). The entire room must fit within the region.
+
+```csharp
+new MustBeInRegionConstraint<RoomType>(
+    RoomType.Shop,
+    minX: 0,
+    maxX: 20,
+    minY: 0,
+    maxY: 20
+)
+```
+
+**Use case:** Restrict room placement to specific rectangular areas. Common scenarios include:
+- Shops only in market district (specific region)
+- Boss rooms only in central arena (bounded region)
+- Special rooms restricted to specific thematic areas
+
+**Example:**
+```csharp
+// Shop must be within rectangular region (0,0) to (20,20)
+new MustBeInRegionConstraint<RoomType>(RoomType.Shop, 0, 20, 0, 20)
+
+// Boss room must be in central arena (region from -10 to 10 in both axes)
+new MustBeInRegionConstraint<RoomType>(RoomType.Boss, -10, 10, -10, 10)
+```
+
+**Behavior:**
+- Validates that **all cells** of the room fit within the region bounds
+- Returns `false` if any cell extends beyond the region
+- Coordinates are inclusive (minX <= cell.X <= maxX)
+
+### MinSpatialDistanceFromStartConstraint
+
+Requires a room to be at least N cells from the spawn position in 2D space (spatial distance, not graph distance).
+
+```csharp
+new MinSpatialDistanceFromStartConstraint<RoomType>(
+    RoomType.Treasure,
+    minDistance: 10
+)
+```
+
+**Use case:** Ensure room types are spatially separated from spawn. Common scenarios include:
+- Treasure rooms should be far from spawn (spatial distance)
+- Boss rooms should be in distant areas
+- Special rooms should maintain minimum spatial distance from start
+
+**Important:** This constraint uses **spatial distance** (Manhattan distance in cells), not graph distance.
+
+**Example:**
+```csharp
+// Treasure rooms must be at least 10 cells from spawn (spatial distance)
+new MinSpatialDistanceFromStartConstraint<RoomType>(RoomType.Treasure, 10)
+
+// Boss rooms must be at least 15 cells from spawn
+new MinSpatialDistanceFromStartConstraint<RoomType>(RoomType.Boss, 15)
+```
+
+**Behavior:**
+- Calculates minimum distance from any cell of this room to any cell of spawn room
+- Uses Manhattan distance (|x1-x2| + |y1-y2|)
+- Returns `true` if minimum distance >= minDistance
+- Returns `true` if spawn room hasn't been placed yet (permissive during early placement)
+
+### MaxSpatialDistanceFromStartConstraint
+
+Requires a room to be within N cells of the spawn position in 2D space (spatial distance, not graph distance).
+
+```csharp
+new MaxSpatialDistanceFromStartConstraint<RoomType>(
+    RoomType.Shop,
+    maxDistance: 8
+)
+```
+
+**Use case:** Ensure room types are accessible early (spatially close to spawn). Common scenarios include:
+- Shop rooms should be accessible early (spatial proximity)
+- Tutorial rooms should be near spawn
+- Safe rooms should be within reach of starting area
+
+**Important:** This constraint uses **spatial distance** (Manhattan distance in cells), not graph distance.
+
+**Example:**
+```csharp
+// Shop must be within 8 cells of spawn (spatial proximity)
+new MaxSpatialDistanceFromStartConstraint<RoomType>(RoomType.Shop, 8)
+
+// Tutorial rooms must be within 5 cells of spawn
+new MaxSpatialDistanceFromStartConstraint<RoomType>(RoomType.Tutorial, 5)
+```
+
+**Behavior:**
+- Calculates minimum distance from any cell of this room to any cell of spawn room
+- Uses Manhattan distance (|x1-x2| + |y1-y2|)
+- Returns `true` if minimum distance <= maxDistance
+- Returns `true` if spawn room hasn't been placed yet (permissive during early placement)
+
+### Combining Spatial and Graph Constraints
+
+Spatial constraints can be combined with graph constraints using `CompositeConstraint`. Both constraint types are evaluated in their respective phases:
+
+- **Graph constraints**: Evaluated during room type assignment (Phase 1)
+- **Spatial constraints**: Evaluated during spatial placement (Phase 2)
+- **Both must pass**: A room must satisfy both graph constraints AND spatial constraints
+
+**Example - Combining graph and spatial constraints:**
+```csharp
+// Boss: far from start (graph distance) AND in center quadrant (spatial)
+var bossConstraint = CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),  // Graph constraint
+    new MustBeInQuadrantConstraint<RoomType>(RoomType.Boss, Quadrant.Center)  // Spatial constraint
+);
+
+// Secret: not on critical path (graph) AND near boss (spatial)
+var secretConstraint = CompositeConstraint<RoomType>.And(
+    new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),  // Graph constraint
+    new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 5)  // Spatial constraint
+);
+```
+
+**Example - Multiple spatial constraints:**
+```csharp
+// Shop: in top-right quadrant AND within 6 cells of combat rooms
+var shopConstraint = CompositeConstraint<RoomType>.And(
+    new MustBeInQuadrantConstraint<RoomType>(RoomType.Shop, Quadrant.TopRight),
+    new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Shop, RoomType.Combat, 6)
+);
+```
+
+### Spatial Constraint Patterns
+
+**Bazaar Pattern (Shops Cluster):**
+```csharp
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Shop, Quadrant.TopRight),
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Shop, 8, 2)
+```
+
+**Boss Arena Pattern:**
+```csharp
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Boss, Quadrant.Center),
+new MinSpatialDistanceFromStartConstraint<RoomType>(RoomType.Boss, 10)
+```
+
+**Secret Near Boss Pattern:**
+```csharp
+new NotOnCriticalPathConstraint<RoomType>(RoomType.Secret),  // Graph constraint
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 5)  // Spatial constraint
+```
+
+**Treasure Vault Pattern:**
+```csharp
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Treasure, 6, 2),
+new MinSpatialDistanceFromStartConstraint<RoomType>(RoomType.Treasure, 8)
+```
+
+### Troubleshooting Spatial Constraints
+
+**SpatialPlacementException:**
+If you get this exception, your spatial constraints are too restrictive:
+
+```
+SpatialPlacementException: Could not place room of type Shop: spatial constraint violated
+```
+
+**Solutions:**
+1. **Relax constraints**: Reduce distance requirements or allow more quadrants
+2. **Increase RoomCount**: More rooms = more valid positions
+3. **Check region size**: Ensure region is large enough for room templates
+4. **Verify cluster radius**: Ensure clusterRadius is large enough for room sizes
+
+**Example fix:**
+```csharp
+// Before: Too restrictive (region too small for 3x3 room)
+new MustBeInRegionConstraint<RoomType>(RoomType.Shop, 0, 2, 0, 2)  // Only 3x3 cells
+
+// After: More flexible (larger region)
+new MustBeInRegionConstraint<RoomType>(RoomType.Shop, 0, 20, 0, 20)  // 21x21 cells
+```
+
+**Impossible Constraints:**
+Some spatial constraint combinations are impossible:
+
+```csharp
+// ❌ Impossible: Must be in top-right AND bottom-left
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Boss, Quadrant.TopRight | Quadrant.BottomLeft)
+
+// ❌ Impossible: Region too small for room template
+new MustBeInRegionConstraint<RoomType>(RoomType.Boss, 0, 1, 0, 1)  // 2x2 region, but room is 5x5
+```
+
 ## Next Steps
 
 - **[Configuration](Configuration)** - How to use constraints in config, including multi-floor configs

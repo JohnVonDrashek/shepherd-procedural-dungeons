@@ -1,4 +1,5 @@
 using ShepherdProceduralDungeons.Configuration;
+using ShepherdProceduralDungeons.Constraints;
 using ShepherdProceduralDungeons.Graph;
 using ShepherdProceduralDungeons.Layout;
 using ShepherdProceduralDungeons.Templates;
@@ -19,12 +20,14 @@ public interface ISpatialSolver<TRoomType> where TRoomType : Enum
     /// <param name="templates">Available templates keyed by room type.</param>
     /// <param name="hallwayMode">How to handle non-adjacent rooms.</param>
     /// <param name="rng">Random number generator.</param>
+    /// <param name="constraints">Optional spatial constraints to validate placements.</param>
     /// <returns>List of placed rooms with positions.</returns>
     IReadOnlyList<PlacedRoom<TRoomType>> Solve(
         FloorGraph graph,
         IReadOnlyDictionary<int, TRoomType> assignments,
         IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> templates,
         HallwayMode hallwayMode,
-        Random rng);
+        Random rng,
+        IReadOnlyList<IConstraint<TRoomType>>? constraints = null);
 }
 

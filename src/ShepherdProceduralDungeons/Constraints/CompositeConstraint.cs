@@ -1,13 +1,16 @@
 using ShepherdProceduralDungeons.Graph;
+using ShepherdProceduralDungeons.Layout;
+using ShepherdProceduralDungeons.Templates;
 
 namespace ShepherdProceduralDungeons.Constraints;
 
 /// <summary>
 /// Composes multiple constraints using AND, OR, or NOT logic.
 /// Enables complex constraint patterns like "constraint1 OR constraint2" or "NOT constraint".
+/// Supports both graph-based and spatial constraints.
 /// </summary>
 /// <typeparam name="TRoomType">The enum type representing different room types.</typeparam>
-public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType> where TRoomType : Enum
+public sealed class CompositeConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
 {
     /// <summary>
     /// The room type this constraint applies to.
@@ -196,6 +199,113 @@ public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType> wher
 
         // Return the negation of the constraint's result
         return !Constraints[0].IsValid(node, graph, currentAssignments);
+    }
+
+    /// <summary>
+    /// Checks if a room placement is valid spatially based on the composition logic.
+    /// </summary>
+    public bool IsValidSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments)
+    {
+        return Operator switch
+        {
+            CompositionOperator.And => EvaluateAndSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments),
+            CompositionOperator.Or => EvaluateOrSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments),
+            CompositionOperator.Not => EvaluateNotSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments),
+            _ => throw new InvalidOperationException($"Unknown composition operator: {Operator}")
+        };
+    }
+
+    private bool EvaluateAndSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments)
+    {
+        // Empty AND should always pass
+        if (Constraints.Count == 0)
+        {
+            return true;
+        }
+
+        // All constraints must pass (short-circuit on first failure)
+        foreach (var constraint in Constraints)
+        {
+            // Check if constraint is spatial
+            if (constraint is ISpatialConstraint<TRoomType> spatialConstraint)
+            {
+                if (!spatialConstraint.IsValidSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments))
+                {
+                    return false;
+                }
+            }
+            // For non-spatial constraints, spatial validation always passes
+            // (they are validated in the graph phase)
+        }
+
+        return true;
+    }
+
+    private bool EvaluateOrSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments)
+    {
+        // Empty OR should always fail
+        if (Constraints.Count == 0)
+        {
+            return false;
+        }
+
+        // At least one constraint must pass (short-circuit on first success)
+        foreach (var constraint in Constraints)
+        {
+            // Check if constraint is spatial
+            if (constraint is ISpatialConstraint<TRoomType> spatialConstraint)
+            {
+                if (spatialConstraint.IsValidSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments))
+                {
+                    return true;
+                }
+            }
+            // For non-spatial constraints, spatial validation always passes
+            // (they are validated in the graph phase)
+        }
+
+        return false;
+    }
+
+    private bool EvaluateNotSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments)
+    {
+        // NOT should have exactly one constraint
+        if (Constraints.Count != 1)
+        {
+            throw new InvalidOperationException("NOT composition must contain exactly one constraint.");
+        }
+
+        var constraint = Constraints[0];
+        
+        // Check if constraint is spatial
+        if (constraint is ISpatialConstraint<TRoomType> spatialConstraint)
+        {
+            return !spatialConstraint.IsValidSpatially(proposedPosition, roomTemplate, placedRooms, graph, assignments);
+        }
+        
+        // For non-spatial constraints, NOT always fails in spatial phase
+        // (they are validated in the graph phase)
+        return false;
     }
 
     private static void ValidateSameTargetRoomType(IConstraint<TRoomType>[] constraints, TRoomType expectedTargetRoomType)

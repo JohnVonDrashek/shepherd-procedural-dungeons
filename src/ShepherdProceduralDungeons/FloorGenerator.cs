@@ -692,7 +692,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         {
             incrementalSolver.SetZoneInfo(zoneAssignments, zoneTemplates);
         }
-        return spatialSolver.Solve(graph, assignments, templatesByType, config.HallwayMode, spatialRng);
+        return spatialSolver.Solve(graph, assignments, templatesByType, config.HallwayMode, spatialRng, config.Constraints);
     }
 
     private IReadOnlyDictionary<TRoomType, IReadOnlyList<RoomTemplate<TRoomType>>> OrganizeTemplatesByType(FloorConfig<TRoomType> config)

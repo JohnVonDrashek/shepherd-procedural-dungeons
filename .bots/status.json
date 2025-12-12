@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-13T01:00:00Z",
-  "nextFeatureId": 4,
+  "lastUpdated": "2025-12-13T04:30:00Z",
+  "nextFeatureId": 5,
   "nextOptimizationId": 7,
   "nextRefactoringId": 3,
   "refactorings": [
@@ -108,6 +108,24 @@
       "dependencies": [],
       "notes": [
         "Documentation updated in wiki/Room-Templates.md, wiki/API-Reference.md, and wiki/Best-Practices.md with comprehensive template weighting guide, including zero-weight templates (disabled templates) and best practices."
+      ]
+    },
+    {
+      "id": "FEATURE-004",
+      "title": "Spatial Constraints System",
+      "status": "complete",
+      "priority": "high",
+      "complexity": "complex",
+      "created": "2025-12-13T01:15:00Z",
+      "updated": "2025-12-13T04:30:00Z",
+      "featureFile": ".bots/features/FEATURE-004-spatial-constraints.md",
+      "testFile": "tests/ShepherdProceduralDungeons.Tests/SpatialConstraintsTests.cs",
+      "dependencies": [],
+      "notes": [
+        "Implementation complete: All 7 spatial constraint types implemented (MustBeInQuadrantConstraint, MinSpatialDistanceFromRoomTypeConstraint, MaxSpatialDistanceFromRoomTypeConstraint, MustFormSpatialClusterConstraint, MustBeInRegionConstraint, MinSpatialDistanceFromStartConstraint, MaxSpatialDistanceFromStartConstraint). ISpatialConstraint interface created. CompositeConstraint updated to support spatial constraints. IncrementalSolver integrated with spatial constraint checking. All 22 spatial constraint tests pass. One unrelated test failure in DebugLoggingOptimizationTests (pre-existing issue, not related to spatial constraints).",
+        "Tests failed verification - ALL tests must pass (attempt 1), re-spawning Coding Bot. 1 test failing: DebugLoggingOptimizationTests.PerformanceImpact_VerboseDisabled_NoStringFormattingOverhead - ArgumentOutOfRangeException in StringBuilder.ToString(). Need to fix this test so all 439 tests pass (exit code 0).",
+        "Test fix complete: Fixed DebugLoggingOptimizationTests.PerformanceImpact_VerboseDisabled_NoStringFormattingOverhead by changing output.ToString() to writer.ToString() to avoid ArgumentOutOfRangeException. All 439 tests now pass (exit code 0).",
+        "Documentation complete: Added comprehensive spatial constraints documentation to wiki/Constraints.md, wiki/API-Reference.md, and wiki/Best-Practices.md with examples, API reference, best practices, and troubleshooting guidance."
       ]
     }
   ],

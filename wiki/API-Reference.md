@@ -560,10 +560,10 @@ public class OnlyInZoneConstraint<TRoomType> : IConstraint<TRoomType>, IZoneAwar
 
 #### CompositeConstraint
 
-Composes multiple constraints using AND, OR, or NOT logic.
+Composes multiple constraints using AND, OR, or NOT logic. Supports both graph constraints and spatial constraints.
 
 ```csharp
-public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType> where TRoomType : Enum
+public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType>, ISpatialConstraint<TRoomType> where TRoomType : Enum
 {
     public TRoomType TargetRoomType { get; }
     public CompositionOperator Operator { get; }
@@ -574,15 +574,23 @@ public sealed class CompositeConstraint<TRoomType> : IConstraint<TRoomType> wher
     public static CompositeConstraint<TRoomType> Or(params IConstraint<TRoomType>[] constraints);
     public static CompositeConstraint<TRoomType> Not(IConstraint<TRoomType> constraint);
     
-    // Implementation
+    // Graph constraint implementation
     public bool IsValid(
         RoomNode node, 
         FloorGraph graph, 
         IReadOnlyDictionary<int, TRoomType> currentAssignments);
+    
+    // Spatial constraint implementation
+    public bool IsValidSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments);
 }
 ```
 
-**Use case:** Express complex constraint logic with AND/OR/NOT operators.
+**Use case:** Express complex constraint logic with AND/OR/NOT operators. Can combine graph constraints with spatial constraints.
 
 #### CompositionOperator
 
@@ -594,6 +602,154 @@ public enum CompositionOperator
     And,  // All constraints must pass
     Or,   // At least one constraint must pass
     Not   // The wrapped constraint must fail
+}
+```
+
+### Spatial Constraints
+
+Spatial constraints control room placement based on 2D spatial positions. They are evaluated during the spatial placement phase, not during type assignment.
+
+#### ISpatialConstraint
+
+Interface for spatial constraints that validate room placement based on 2D spatial positions.
+
+```csharp
+public interface ISpatialConstraint<TRoomType> : IConstraint<TRoomType> where TRoomType : Enum
+{
+    bool IsValidSpatially(
+        Cell proposedPosition,
+        RoomTemplate<TRoomType> roomTemplate,
+        IReadOnlyList<PlacedRoom<TRoomType>> placedRooms,
+        FloorGraph graph,
+        IReadOnlyDictionary<int, TRoomType> assignments);
+}
+```
+
+#### MustBeInQuadrantConstraint
+
+Requires a room to be placed in a specific quadrant of the dungeon.
+
+```csharp
+public sealed class MustBeInQuadrantConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public Quadrant AllowedQuadrants { get; }
+    
+    public MustBeInQuadrantConstraint(TRoomType targetRoomType, Quadrant allowedQuadrants);
+}
+```
+
+#### Quadrant
+
+Enumeration of dungeon quadrants (flags enum).
+
+```csharp
+[Flags]
+public enum Quadrant
+{
+    TopLeft = 1,
+    TopRight = 2,
+    BottomLeft = 4,
+    BottomRight = 8,
+    Center = 16
+}
+```
+
+#### MinSpatialDistanceFromRoomTypeConstraint
+
+Requires a room to be at least N cells away from rooms of specified type(s) in 2D space.
+
+```csharp
+public sealed class MinSpatialDistanceFromRoomTypeConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ReferenceRoomTypes { get; }
+    public int MinDistance { get; }
+    
+    // Single reference type
+    public MinSpatialDistanceFromRoomTypeConstraint(TRoomType targetRoomType, TRoomType referenceRoomType, int minDistance);
+    
+    // Multiple reference types (OR logic)
+    public MinSpatialDistanceFromRoomTypeConstraint(TRoomType targetRoomType, int minDistance, params TRoomType[] referenceRoomTypes);
+}
+```
+
+#### MaxSpatialDistanceFromRoomTypeConstraint
+
+Requires a room to be within N cells of rooms of specified type(s) in 2D space.
+
+```csharp
+public sealed class MaxSpatialDistanceFromRoomTypeConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public IReadOnlySet<TRoomType> ReferenceRoomTypes { get; }
+    public int MaxDistance { get; }
+    
+    // Single reference type
+    public MaxSpatialDistanceFromRoomTypeConstraint(TRoomType targetRoomType, TRoomType referenceRoomType, int maxDistance);
+    
+    // Multiple reference types (OR logic)
+    public MaxSpatialDistanceFromRoomTypeConstraint(TRoomType targetRoomType, int maxDistance, params TRoomType[] referenceRoomTypes);
+}
+```
+
+#### MustFormSpatialClusterConstraint
+
+Requires rooms of a type to form a spatial cluster (all within clusterRadius of each other).
+
+```csharp
+public sealed class MustFormSpatialClusterConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public int ClusterRadius { get; }
+    public int MinClusterSize { get; }
+    
+    public MustFormSpatialClusterConstraint(TRoomType targetRoomType, int clusterRadius, int minClusterSize);
+}
+```
+
+#### MustBeInRegionConstraint
+
+Requires a room to be placed within a defined rectangular region.
+
+```csharp
+public sealed class MustBeInRegionConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public int MinX { get; }
+    public int MaxX { get; }
+    public int MinY { get; }
+    public int MaxY { get; }
+    
+    public MustBeInRegionConstraint(TRoomType targetRoomType, int minX, int maxX, int minY, int maxY);
+}
+```
+
+#### MinSpatialDistanceFromStartConstraint
+
+Requires a room to be at least N cells from the spawn position in 2D space.
+
+```csharp
+public sealed class MinSpatialDistanceFromStartConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public int MinDistance { get; }
+    
+    public MinSpatialDistanceFromStartConstraint(TRoomType targetRoomType, int minDistance);
+}
+```
+
+#### MaxSpatialDistanceFromStartConstraint
+
+Requires a room to be within N cells of the spawn position in 2D space.
+
+```csharp
+public sealed class MaxSpatialDistanceFromStartConstraint<TRoomType> : ISpatialConstraint<TRoomType> where TRoomType : Enum
+{
+    public TRoomType TargetRoomType { get; }
+    public int MaxDistance { get; }
+    
+    public MaxSpatialDistanceFromStartConstraint(TRoomType targetRoomType, int maxDistance);
 }
 ```
 

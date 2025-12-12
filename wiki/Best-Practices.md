@@ -190,6 +190,69 @@ Constraints = new[]
 }
 ```
 
+### Spatial Constraints Best Practices
+
+Spatial constraints enable powerful dungeon design patterns, but require careful consideration:
+
+**Start with simple spatial constraints:**
+```csharp
+// ✅ Start simple: Single quadrant constraint
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Shop, Quadrant.TopRight)
+
+// Add complexity later if needed
+new MustBeInQuadrantConstraint<RoomType>(RoomType.Shop, Quadrant.TopRight),
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Shop, 8, 2)
+```
+
+**Consider room sizes when using region constraints:**
+```csharp
+// ❌ Region too small for room template
+new MustBeInRegionConstraint<RoomType>(RoomType.Boss, 0, 2, 0, 2)  // 3x3 region, but room is 5x5
+
+// ✅ Region large enough for room template
+new MustBeInRegionConstraint<RoomType>(RoomType.Boss, 0, 20, 0, 20)  // 21x21 region
+```
+
+**Use appropriate distance values:**
+```csharp
+// ✅ Reasonable distances (consider room sizes)
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Treasure, RoomType.Boss, 10)
+new MaxSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Secret, RoomType.Boss, 5)
+
+// ❌ Too restrictive (may be impossible to satisfy)
+new MinSpatialDistanceFromRoomTypeConstraint<RoomType>(RoomType.Treasure, RoomType.Boss, 100)
+```
+
+**Combine spatial and graph constraints thoughtfully:**
+```csharp
+// ✅ Good: Complementary constraints
+CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 5),  // Graph: far from start
+    new MustBeInQuadrantConstraint<RoomType>(RoomType.Boss, Quadrant.Center)  // Spatial: in center
+)
+
+// ⚠️ May be too restrictive: Both graph AND spatial constraints
+CompositeConstraint<RoomType>.And(
+    new MinDistanceFromStartConstraint<RoomType>(RoomType.Boss, 8),  // Graph: very far
+    new MinSpatialDistanceFromStartConstraint<RoomType>(RoomType.Boss, 20)  // Spatial: very far
+)
+```
+
+**Cluster constraints require careful tuning:**
+```csharp
+// ✅ Good: Reasonable cluster radius (consider room sizes)
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Shop, 8, 2)  // 8-cell radius, min 2 shops
+
+// ❌ Too restrictive: Cluster radius too small
+new MustFormSpatialClusterConstraint<RoomType>(RoomType.Shop, 2, 5)  // 2-cell radius, min 5 shops (impossible)
+```
+
+**Remember: Spatial distance ≠ Graph distance:**
+- Graph distance: Number of edges in the graph (topology)
+- Spatial distance: Manhattan distance in 2D space (cells)
+- A room can be spatially close but graph-distant, or vice versa
+- Use spatial constraints when you care about 2D layout, not just graph topology
+
 ### Use Constraint Patterns
 
 Common patterns that work well:
