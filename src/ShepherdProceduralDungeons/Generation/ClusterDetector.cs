@@ -67,6 +67,13 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
             return Array.Empty<RoomCluster<TRoomType>>();
         }
 
+        // Pre-calculate and cache all room centroids to avoid repeated calculations
+        var centroidCache = new Dictionary<PlacedRoom<TRoomType>, (double X, double Y)>();
+        foreach (var room in rooms)
+        {
+            centroidCache[room] = CalculateCentroid(room);
+        }
+
         // Clustering algorithm that ensures all pairs in a cluster are within epsilon
         // This is stricter than standard DBSCAN but matches test expectations
         var visited = new HashSet<int>();
@@ -80,7 +87,7 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
 
             // Try to build a cluster starting from this room
             // All rooms in the cluster must be within epsilon of each other
-            var cluster = BuildCompleteGraphCluster(room, rooms, visited, epsilon, minClusterSize, maxClusterSize);
+            var cluster = BuildCompleteGraphCluster(room, rooms, visited, epsilon, minClusterSize, maxClusterSize, centroidCache);
             
             if (cluster != null && cluster.Count >= minClusterSize)
             {
@@ -103,10 +110,14 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
         HashSet<int> visited,
         double epsilon,
         int minClusterSize,
-        int? maxClusterSize)
+        int? maxClusterSize,
+        Dictionary<PlacedRoom<TRoomType>, (double X, double Y)> centroidCache)
     {
         var cluster = new List<PlacedRoom<TRoomType>> { seedRoom };
         var candidates = new List<PlacedRoom<TRoomType>>();
+        
+        // Get seed room centroid from cache
+        var seedCentroid = centroidCache[seedRoom];
         
         // Find all rooms that are within epsilon of the seed room
         foreach (var room in allRooms)
@@ -114,9 +125,8 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
             if (room.NodeId == seedRoom.NodeId || visited.Contains(room.NodeId))
                 continue;
 
-            var centroid1 = CalculateCentroid(seedRoom);
-            var centroid2 = CalculateCentroid(room);
-            var distance = CalculateDistance(centroid1, centroid2);
+            var roomCentroid = centroidCache[room];
+            var distance = CalculateDistance(seedCentroid, roomCentroid);
             
             if (distance <= epsilon)
             {
@@ -135,13 +145,13 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
             }
 
             bool canAdd = true;
+            var candidateCentroid = centroidCache[candidate];
             
             // Check if candidate is within epsilon of all existing cluster members
             foreach (var existingRoom in cluster)
             {
-                var centroid1 = CalculateCentroid(existingRoom);
-                var centroid2 = CalculateCentroid(candidate);
-                var distance = CalculateDistance(centroid1, centroid2);
+                var existingCentroid = centroidCache[existingRoom];
+                var distance = CalculateDistance(existingCentroid, candidateCentroid);
                 
                 if (distance > epsilon)
                 {
@@ -163,17 +173,18 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
     private List<PlacedRoom<TRoomType>> FindNeighbors(
         PlacedRoom<TRoomType> room,
         List<PlacedRoom<TRoomType>> allRooms,
-        double epsilon)
+        double epsilon,
+        Dictionary<PlacedRoom<TRoomType>, (double X, double Y)> centroidCache)
     {
         var neighbors = new List<PlacedRoom<TRoomType>>();
-        var roomCentroid = CalculateCentroid(room);
+        var roomCentroid = centroidCache[room];
 
         foreach (var otherRoom in allRooms)
         {
             if (otherRoom.NodeId == room.NodeId)
                 continue;
 
-            var otherCentroid = CalculateCentroid(otherRoom);
+            var otherCentroid = centroidCache[otherRoom];
             var distance = CalculateDistance(roomCentroid, otherCentroid);
 
             if (distance <= epsilon)
@@ -187,15 +198,23 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
 
     private (double X, double Y) CalculateCentroid(PlacedRoom<TRoomType> room)
     {
-        var cells = room.GetWorldCells().ToList();
-        if (cells.Count == 0)
+        var cells = room.GetWorldCells();
+        long sumX = 0, sumY = 0;
+        int count = 0;
+        
+        foreach (var cell in cells)
+        {
+            sumX += cell.X;
+            sumY += cell.Y;
+            count++;
+        }
+        
+        if (count == 0)
         {
             return (room.Position.X, room.Position.Y);
         }
-
-        var avgX = cells.Average(c => c.X);
-        var avgY = cells.Average(c => c.Y);
-        return (avgX, avgY);
+        
+        return ((double)sumX / count, (double)sumY / count);
     }
 
     private double CalculateDistance((double X, double Y) point1, (double X, double Y) point2)
@@ -210,18 +229,31 @@ internal sealed class ClusterDetector<TRoomType> where TRoomType : Enum
         TRoomType roomType,
         List<PlacedRoom<TRoomType>> rooms)
     {
-        // Calculate centroid
-        var allCells = rooms.SelectMany(r => r.GetWorldCells()).ToList();
-        var centroidX = (int)Math.Round(allCells.Average(c => c.X));
-        var centroidY = (int)Math.Round(allCells.Average(c => c.Y));
+        // Calculate centroid and bounding box in a single pass
+        var allCells = rooms.SelectMany(r => r.GetWorldCells());
+        
+        long sumX = 0, sumY = 0;
+        int count = 0;
+        int minX = int.MaxValue, maxX = int.MinValue;
+        int minY = int.MaxValue, maxY = int.MinValue;
+        
+        foreach (var cell in allCells)
+        {
+            sumX += cell.X;
+            sumY += cell.Y;
+            count++;
+            
+            if (cell.X < minX) minX = cell.X;
+            if (cell.X > maxX) maxX = cell.X;
+            if (cell.Y < minY) minY = cell.Y;
+            if (cell.Y > maxY) maxY = cell.Y;
+        }
+        
+        var centroidX = count > 0 ? (int)Math.Round((double)sumX / count) : 0;
+        var centroidY = count > 0 ? (int)Math.Round((double)sumY / count) : 0;
         var centroid = new Cell(centroidX, centroidY);
-
-        // Calculate bounding box
-        var minX = allCells.Min(c => c.X);
-        var maxX = allCells.Max(c => c.X);
-        var minY = allCells.Min(c => c.Y);
-        var maxY = allCells.Max(c => c.Y);
-        var boundingBox = (new Cell((int)minX, (int)minY), new Cell((int)maxX, (int)maxY));
+        
+        var boundingBox = (new Cell(minX, minY), new Cell(maxX, maxY));
 
         return new RoomCluster<TRoomType>(
             clusterId: clusterId,

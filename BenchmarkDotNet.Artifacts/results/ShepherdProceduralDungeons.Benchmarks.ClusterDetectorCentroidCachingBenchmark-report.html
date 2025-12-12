@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ShepherdProceduralDungeons.Benchmarks.ClusterDetectorCentroidCachingBenchmark-20251212-120246</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.2 (24G325) [Darwin 24.6.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.100
+  [Host]     : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                     </th><th>clusterSize</th><th>roomCount</th><th>roomSize</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>CreateClusterPerformance</td><td>2</td><td>?</td><td>?</td><td>1.064 &mu;s</td><td>0.0024 &mu;s</td><td>0.0022 &mu;s</td><td>?</td><td>?</td><td>0.3948</td><td>0.0019</td><td>-</td><td>3.23 KB</td><td>?</td>
+</tr><tr><td>CreateClusterPerformance</td><td>5</td><td>?</td><td>?</td><td>1.591 &mu;s</td><td>0.0036 &mu;s</td><td>0.0033 &mu;s</td><td>?</td><td>?</td><td>0.5054</td><td>0.0019</td><td>-</td><td>4.13 KB</td><td>?</td>
+</tr><tr><td>CreateClusterPerformance</td><td>10</td><td>?</td><td>?</td><td>2.586 &mu;s</td><td>0.0078 &mu;s</td><td>0.0073 &mu;s</td><td>?</td><td>?</td><td>0.6790</td><td>0.0038</td><td>-</td><td>5.57 KB</td><td>?</td>
+</tr><tr><td>ClusterDetection</td><td>?</td><td>10</td><td>?</td><td>2.256 &mu;s</td><td>0.0051 &mu;s</td><td>0.0045 &mu;s</td><td>1.00</td><td>0.00</td><td>0.8354</td><td>0.0038</td><td>-</td><td>6.84 KB</td><td>1.00</td>
+</tr><tr><td>ClusterDetectionMemoryAllocations</td><td>?</td><td>10</td><td>?</td><td>172.513 &mu;s</td><td>0.5700 &mu;s</td><td>0.5052 &mu;s</td><td>76.49</td><td>0.34</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>7.5 KB</td><td>1.10</td>
+</tr><tr><td>CreateClusterPerformance</td><td>20</td><td>?</td><td>?</td><td>4.653 &mu;s</td><td>0.0126 &mu;s</td><td>0.0112 &mu;s</td><td>?</td><td>?</td><td>1.0529</td><td>-</td><td>-</td><td>8.66 KB</td><td>?</td>
+</tr><tr><td>ClusterDetection</td><td>?</td><td>20</td><td>?</td><td>4.765 &mu;s</td><td>0.0108 &mu;s</td><td>0.0090 &mu;s</td><td>1.00</td><td>0.00</td><td>1.6022</td><td>0.0153</td><td>-</td><td>13.13 KB</td><td>1.00</td>
+</tr><tr><td>ClusterDetectionMemoryAllocations</td><td>?</td><td>20</td><td>?</td><td>184.350 &mu;s</td><td>2.8405 &mu;s</td><td>2.6570 &mu;s</td><td>38.75</td><td>0.58</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>14.29 KB</td><td>1.09</td>
+</tr><tr><td>ClusterDetection</td><td>?</td><td>50</td><td>?</td><td>13.491 &mu;s</td><td>0.0428 &mu;s</td><td>0.0401 &mu;s</td><td>1.00</td><td>0.00</td><td>3.7231</td><td>0.0916</td><td>-</td><td>30.48 KB</td><td>1.00</td>
+</tr><tr><td>ClusterDetectionMemoryAllocations</td><td>?</td><td>50</td><td>?</td><td>191.079 &mu;s</td><td>3.0182 &mu;s</td><td>2.6756 &mu;s</td><td>14.17</td><td>0.21</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>31.79 KB</td><td>1.04</td>
+</tr><tr><td>ClusterDetection</td><td>?</td><td>100</td><td>?</td><td>35.500 &mu;s</td><td>0.1337 &mu;s</td><td>0.1250 &mu;s</td><td>1.00</td><td>0.00</td><td>7.5684</td><td>0.3662</td><td>-</td><td>61.9 KB</td><td>1.00</td>
+</tr><tr><td>ClusterDetectionMemoryAllocations</td><td>?</td><td>100</td><td>?</td><td>220.118 &mu;s</td><td>4.3866 &mu;s</td><td>12.3005 &mu;s</td><td>6.51</td><td>0.27</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>63.21 KB</td><td>1.02</td>
+</tr><tr><td>CentroidCalculation</td><td>?</td><td>?</td><td>large</td><td>76.227 &mu;s</td><td>0.2028 &mu;s</td><td>0.1798 &mu;s</td><td>?</td><td>?</td><td>12.0850</td><td>-</td><td>-</td><td>99.22 KB</td><td>?</td>
+</tr><tr><td>CentroidCalculation</td><td>?</td><td>?</td><td>medium</td><td>21.546 &mu;s</td><td>0.0289 &mu;s</td><td>0.0271 &mu;s</td><td>?</td><td>?</td><td>4.9438</td><td>-</td><td>-</td><td>40.63 KB</td><td>?</td>
+</tr><tr><td>CentroidCalculation</td><td>?</td><td>?</td><td>small</td><td>9.757 &mu;s</td><td>0.0264 &mu;s</td><td>0.0234 &mu;s</td><td>?</td><td>?</td><td>3.4332</td><td>-</td><td>-</td><td>28.13 KB</td><td>?</td>
+</tr></tbody></table>
+</body>
+</html>
