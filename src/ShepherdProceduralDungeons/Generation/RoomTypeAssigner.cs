@@ -103,14 +103,14 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
             graph.CriticalPath = FindPath(graph, graph.StartNodeId, graph.BossNodeId);
             foreach (int nodeId in graph.CriticalPath)
             {
-                graph.Nodes.First(n => n.Id == nodeId).IsOnCriticalPath = true;
+                graph.GetNode(nodeId).IsOnCriticalPath = true;
             }
         }
         else
         {
             // No boss room - critical path is just the start node
             graph.CriticalPath = new[] { graph.StartNodeId };
-            graph.Nodes.First(n => n.Id == graph.StartNodeId).IsOnCriticalPath = true;
+            graph.GetNode(graph.StartNodeId).IsOnCriticalPath = true;
         }
 
         // 4. Assign required room types based on constraints
@@ -223,7 +223,7 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
                 return path;
             }
 
-            var currentNode = graph.Nodes.First(n => n.Id == current);
+            var currentNode = graph.GetNode(current);
             foreach (var conn in currentNode.Connections)
             {
                 int neighborId = conn.GetOtherNodeId(current);

@@ -836,6 +836,52 @@ Generates a connected graph with the specified number of nodes.
 
 **Returns:** `FloorGraph` - A connected floor graph
 
+## FloorGraph
+
+Represents the topology of a dungeon floor as a graph of connected rooms.
+
+### Properties
+
+```csharp
+public required IReadOnlyList<RoomNode> Nodes { get; init; }
+public required IReadOnlyList<RoomConnection> Connections { get; init; }
+public required int StartNodeId { get; init; }
+public int BossNodeId { get; internal set; }
+public IReadOnlyList<int> CriticalPath { get; internal set; }
+```
+
+**Nodes**: All room nodes in the graph.
+
+**Connections**: All connections between rooms.
+
+**StartNodeId**: ID of the start node (always 0).
+
+**BossNodeId**: ID of the boss room node. Set by RoomTypeAssigner.
+
+**CriticalPath**: Sequence of node IDs forming the critical path from spawn to boss. Set by RoomTypeAssigner.
+
+### Methods
+
+#### GetNode
+
+```csharp
+public RoomNode GetNode(int id)
+```
+
+Gets a node by its ID using O(1) dictionary lookup.
+
+**Parameters:**
+- `id` - The node ID to look up
+
+**Returns:** `RoomNode` - The room node with the specified ID
+
+**Exceptions:**
+- `KeyNotFoundException` - Node with the specified ID does not exist
+
+**Performance:** O(1) - Uses an internal dictionary for fast lookups. The dictionary is lazily initialized on first access, so there is no overhead for graphs that never need lookups.
+
+**Note:** This method provides optimal performance for node lookups. For best performance, use `GetNode()` instead of `Nodes.First(n => n.Id == id)`.
+
 ## HallwayMode
 
 Hallway generation mode.

@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace ShepherdProceduralDungeons.Graph;
 
 /// <summary>
@@ -5,6 +7,8 @@ namespace ShepherdProceduralDungeons.Graph;
 /// </summary>
 public sealed class FloorGraph
 {
+    private Dictionary<int, RoomNode>? _nodeLookup;
+
     /// <summary>
     /// All room nodes in the graph.
     /// </summary>
@@ -32,7 +36,15 @@ public sealed class FloorGraph
     public IReadOnlyList<int> CriticalPath { get; internal set; } = Array.Empty<int>();
 
     /// <summary>
-    /// Gets a node by its ID.
+    /// Gets a node by its ID using O(1) dictionary lookup.
     /// </summary>
-    public RoomNode GetNode(int id) => Nodes.First(n => n.Id == id);
+    public RoomNode GetNode(int id)
+    {
+        // Lazy initialization: populate dictionary on first access
+        if (_nodeLookup == null)
+        {
+            _nodeLookup = Nodes.ToDictionary(n => n.Id, n => n);
+        }
+        return _nodeLookup[id];
+    }
 }

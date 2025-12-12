@@ -1,3 +1,4 @@
+using System.Linq;
 using ShepherdProceduralDungeons.Exceptions;
 using ShepherdProceduralDungeons.Graph;
 using ShepherdProceduralDungeons.Layout;
@@ -23,10 +24,13 @@ public sealed class HallwayGenerator<TRoomType> where TRoomType : Enum
         var hallways = new List<Hallway>();
         int hallwayId = 0;
 
+        // Create room lookup dictionary for O(1) lookups
+        var roomLookup = rooms.ToDictionary(r => r.NodeId, r => r);
+
         foreach (var conn in graph.Connections.Where(c => c.RequiresHallway))
         {
-            var roomA = rooms.First(r => r.NodeId == conn.NodeAId);
-            var roomB = rooms.First(r => r.NodeId == conn.NodeBId);
+            var roomA = roomLookup[conn.NodeAId];
+            var roomB = roomLookup[conn.NodeBId];
 
             // Get all possible door positions on each room
             var doorsA = roomA.GetExteriorEdgesWorld()

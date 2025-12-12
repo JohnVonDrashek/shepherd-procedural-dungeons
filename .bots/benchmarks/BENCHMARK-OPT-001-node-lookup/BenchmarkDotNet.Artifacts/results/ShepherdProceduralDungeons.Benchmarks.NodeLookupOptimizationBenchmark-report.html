@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ShepherdProceduralDungeons.Benchmarks.NodeLookupOptimizationBenchmark-20251212-010647</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.2 (24G325) [Darwin 24.6.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.100
+  [Host]     : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                </th><th>nodeCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>BfsPathfinding</td><td>10</td><td>714.6 ns</td><td>6.08 ns</td><td>4.75 ns</td><td>713.8 ns</td><td>1.00</td><td>0.00</td><td>0.3862</td><td>0.0010</td><td>3232 B</td><td>1.00</td>
+</tr><tr><td>CriticalPathMarking</td><td>10</td><td>846.3 ns</td><td>16.95 ns</td><td>36.49 ns</td><td>850.6 ns</td><td>1.15</td><td>0.07</td><td>0.4387</td><td>0.0010</td><td>3672 B</td><td>1.14</td>
+</tr><tr><td>GetNodeLookups</td><td>10</td><td>331.3 ns</td><td>6.68 ns</td><td>12.38 ns</td><td>326.6 ns</td><td>0.46</td><td>0.02</td><td>0.0362</td><td>-</td><td>304 B</td><td>0.09</td>
+</tr><tr><td>HallwayGenerationRoomLookups</td><td>10</td><td>370.1 ns</td><td>2.97 ns</td><td>2.63 ns</td><td>369.5 ns</td><td>0.52</td><td>0.01</td><td>0.2589</td><td>0.0010</td><td>2168 B</td><td>0.67</td>
+</tr><tr><td>IncrementalSolverNodeLookups</td><td>10</td><td>694.0 ns</td><td>11.67 ns</td><td>9.74 ns</td><td>692.5 ns</td><td>0.97</td><td>0.02</td><td>0.3662</td><td>-</td><td>3064 B</td><td>0.95</td>
+</tr><tr><td>CombinedOperations</td><td>10</td><td>1,144.7 ns</td><td>22.28 ns</td><td>29.75 ns</td><td>1,130.7 ns</td><td>1.63</td><td>0.04</td><td>0.4749</td><td>-</td><td>3976 B</td><td>1.23</td>
+</tr><tr><td>BfsPathfinding</td><td>50</td><td>10,394.5 ns</td><td>207.05 ns</td><td>523.24 ns</td><td>10,166.5 ns</td><td>1.00</td><td>0.00</td><td>1.8158</td><td>0.0153</td><td>15200 B</td><td>1.00</td>
+</tr><tr><td>CriticalPathMarking</td><td>50</td><td>10,350.3 ns</td><td>82.99 ns</td><td>69.30 ns</td><td>10,338.0 ns</td><td>0.98</td><td>0.05</td><td>1.8768</td><td>0.0153</td><td>15728 B</td><td>1.03</td>
+</tr><tr><td>GetNodeLookups</td><td>50</td><td>457.0 ns</td><td>4.96 ns</td><td>6.09 ns</td><td>457.5 ns</td><td>0.04</td><td>0.00</td><td>0.0362</td><td>-</td><td>304 B</td><td>0.02</td>
+</tr><tr><td>HallwayGenerationRoomLookups</td><td>50</td><td>754.2 ns</td><td>14.80 ns</td><td>15.20 ns</td><td>752.9 ns</td><td>0.07</td><td>0.00</td><td>0.5264</td><td>0.0057</td><td>4408 B</td><td>0.29</td>
+</tr><tr><td>IncrementalSolverNodeLookups</td><td>50</td><td>9,883.1 ns</td><td>189.78 ns</td><td>158.48 ns</td><td>9,862.3 ns</td><td>0.94</td><td>0.05</td><td>1.7548</td><td>-</td><td>14768 B</td><td>0.97</td>
+</tr><tr><td>CombinedOperations</td><td>50</td><td>12,130.8 ns</td><td>219.52 ns</td><td>341.77 ns</td><td>12,044.5 ns</td><td>1.13</td><td>0.06</td><td>1.9073</td><td>0.0153</td><td>16032 B</td><td>1.05</td>
+</tr><tr><td>BfsPathfinding</td><td>100</td><td>36,271.3 ns</td><td>191.83 ns</td><td>179.44 ns</td><td>36,285.8 ns</td><td>1.00</td><td>0.00</td><td>3.6621</td><td>0.0610</td><td>31072 B</td><td>1.000</td>
+</tr><tr><td>CriticalPathMarking</td><td>100</td><td>37,330.9 ns</td><td>220.35 ns</td><td>195.33 ns</td><td>37,296.8 ns</td><td>1.03</td><td>0.01</td><td>3.7842</td><td>0.0610</td><td>31776 B</td><td>1.023</td>
+</tr><tr><td>GetNodeLookups</td><td>100</td><td>653.8 ns</td><td>10.89 ns</td><td>15.97 ns</td><td>656.5 ns</td><td>0.02</td><td>0.00</td><td>0.0362</td><td>-</td><td>304 B</td><td>0.010</td>
+</tr><tr><td>HallwayGenerationRoomLookups</td><td>100</td><td>1,238.5 ns</td><td>23.08 ns</td><td>23.70 ns</td><td>1,236.0 ns</td><td>0.03</td><td>0.00</td><td>0.8602</td><td>0.0172</td><td>7208 B</td><td>0.232</td>
+</tr><tr><td>IncrementalSolverNodeLookups</td><td>100</td><td>34,591.9 ns</td><td>689.02 ns</td><td>988.18 ns</td><td>34,417.3 ns</td><td>0.95</td><td>0.03</td><td>3.5400</td><td>0.0610</td><td>29856 B</td><td>0.961</td>
+</tr><tr><td>CombinedOperations</td><td>100</td><td>40,455.0 ns</td><td>801.74 ns</td><td>923.28 ns</td><td>40,322.8 ns</td><td>1.12</td><td>0.03</td><td>3.7842</td><td>0.0610</td><td>32080 B</td><td>1.032</td>
+</tr><tr><td>BfsPathfinding</td><td>200</td><td>116,311.8 ns</td><td>1,972.78 ns</td><td>1,748.82 ns</td><td>115,756.2 ns</td><td>1.000</td><td>0.00</td><td>7.4463</td><td>0.2441</td><td>62800 B</td><td>1.000</td>
+</tr><tr><td>CriticalPathMarking</td><td>200</td><td>125,995.3 ns</td><td>2,354.24 ns</td><td>4,421.84 ns</td><td>125,866.8 ns</td><td>1.064</td><td>0.05</td><td>7.5684</td><td>0.2441</td><td>63680 B</td><td>1.014</td>
+</tr><tr><td>GetNodeLookups</td><td>200</td><td>1,060.7 ns</td><td>19.25 ns</td><td>16.07 ns</td><td>1,056.6 ns</td><td>0.009</td><td>0.00</td><td>0.0362</td><td>-</td><td>304 B</td><td>0.005</td>
+</tr><tr><td>HallwayGenerationRoomLookups</td><td>200</td><td>2,241.0 ns</td><td>30.72 ns</td><td>27.24 ns</td><td>2,237.1 ns</td><td>0.019</td><td>0.00</td><td>1.5297</td><td>0.0572</td><td>12808 B</td><td>0.204</td>
+</tr><tr><td>IncrementalSolverNodeLookups</td><td>200</td><td>115,512.4 ns</td><td>2,287.27 ns</td><td>2,542.29 ns</td><td>116,096.9 ns</td><td>0.989</td><td>0.02</td><td>7.0801</td><td>0.2441</td><td>60008 B</td><td>0.956</td>
+</tr><tr><td>CombinedOperations</td><td>200</td><td>125,716.7 ns</td><td>1,422.28 ns</td><td>1,260.81 ns</td><td>125,613.2 ns</td><td>1.081</td><td>0.02</td><td>7.5684</td><td>0.2441</td><td>63984 B</td><td>1.019</td>
+</tr></tbody></table>
+</body>
+</html>

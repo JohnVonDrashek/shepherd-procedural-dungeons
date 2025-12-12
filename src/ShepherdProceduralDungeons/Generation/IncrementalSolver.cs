@@ -43,7 +43,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         var hallwayConnections = new HashSet<(int, int)>();
 
         // 1. Place start room at origin
-        var startNode = graph.Nodes.First(n => n.Id == graph.StartNodeId);
+        var startNode = graph.GetNode(graph.StartNodeId);
         var startTemplate = SelectTemplateWithZone(assignments[startNode.Id], templates, rng, startNode.Id);
         var startRoom = PlaceRoom(startNode.Id, startTemplate, new Cell(0, 0), assignments[startNode.Id], startNode.Difficulty);
         placedRooms[startNode.Id] = startRoom;
@@ -67,7 +67,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         {
             int currentId = queue.Dequeue();
             var currentRoom = placedRooms[currentId];
-            var currentNode = graph.Nodes.First(n => n.Id == currentId);
+            var currentNode = graph.GetNode(currentId);
 
             foreach (var conn in currentNode.Connections)
             {
@@ -82,7 +82,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
 
                 if (placement.HasValue)
                 {
-                    var neighborNode = graph.Nodes.First(n => n.Id == neighborId);
+                    var neighborNode = graph.GetNode(neighborId);
                     var neighborRoom = PlaceRoom(neighborId, neighborTemplate, placement.Value, assignments[neighborId], neighborNode.Difficulty);
                     placedRooms[neighborId] = neighborRoom;
                     AddOccupiedCells(neighborRoom, occupiedCells);
@@ -100,7 +100,7 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
                 {
                     // Place nearby with gap for hallway
                     var nearbyPlacement = PlaceNearby(currentRoom, neighborTemplate, occupiedCells, rng);
-                    var neighborNode = graph.Nodes.First(n => n.Id == neighborId);
+                    var neighborNode = graph.GetNode(neighborId);
                     var neighborRoom = PlaceRoom(neighborId, neighborTemplate, nearbyPlacement, assignments[neighborId], neighborNode.Difficulty);
                     placedRooms[neighborId] = neighborRoom;
                     AddOccupiedCells(neighborRoom, occupiedCells);
@@ -279,10 +279,14 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         double? nodeDifficulty = null;
         if (nodeId.HasValue && _graph != null)
         {
-            var node = _graph.Nodes.FirstOrDefault(n => n.Id == nodeId.Value);
-            if (node != null)
+            try
             {
+                var node = _graph.GetNode(nodeId.Value);
                 nodeDifficulty = node.Difficulty;
+            }
+            catch (KeyNotFoundException)
+            {
+                // Node not found, leave difficulty as null
             }
         }
 

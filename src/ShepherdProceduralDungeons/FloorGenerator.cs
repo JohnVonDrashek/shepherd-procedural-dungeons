@@ -1,3 +1,4 @@
+using System.Linq;
 using ShepherdProceduralDungeons.Configuration;
 using ShepherdProceduralDungeons.Exceptions;
 using ShepherdProceduralDungeons.Generation;
@@ -145,7 +146,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
                 var zoneAssigner = new ZoneAssigner<TRoomType>();
                 // Set a temporary critical path for zone assignment (just start node)
                 graph.CriticalPath = new[] { graph.StartNodeId };
-                graph.Nodes.First(n => n.Id == graph.StartNodeId).IsOnCriticalPath = true;
+                graph.GetNode(graph.StartNodeId).IsOnCriticalPath = true;
                 zoneAssignments = zoneAssigner.AssignZones(graph, distanceBasedZones);
             }
         }
@@ -230,7 +231,7 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
                     continue;
 
                 // Check if this room connects to rooms in different zones
-                var roomNode = graph.Nodes.First(n => n.Id == room.NodeId);
+                var roomNode = graph.GetNode(room.NodeId);
                 var hasDifferentZoneConnection = roomNode.Connections.Any(conn =>
                 {
                     var otherNodeId = conn.GetOtherNodeId(room.NodeId);
@@ -383,10 +384,13 @@ public sealed class FloorGenerator<TRoomType> where TRoomType : Enum
         }
 
         // Add direct room-to-room doors (connections without hallways)
+        // Create room lookup dictionary for O(1) lookups
+        var roomLookup = rooms.ToDictionary(r => r.NodeId, r => r);
+        
         foreach (var conn in graph.Connections.Where(c => !c.RequiresHallway))
         {
-            var roomA = rooms.First(r => r.NodeId == conn.NodeAId);
-            var roomB = rooms.First(r => r.NodeId == conn.NodeBId);
+            var roomA = roomLookup[conn.NodeAId];
+            var roomB = roomLookup[conn.NodeBId];
 
             // Find compatible door edges
             var doorPair = FindDirectDoorPair(roomA, roomB);
