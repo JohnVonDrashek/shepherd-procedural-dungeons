@@ -62,13 +62,20 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
             }
         }
 
+        // Pre-group constraints by room type to eliminate repeated filtering
+        var constraintsByType = constraints
+            .GroupBy(c => c.TargetRoomType)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<IConstraint<TRoomType>>)g.ToList());
+
         var localAssignments = new Dictionary<int, TRoomType>();
 
         // 1. Assign spawn to start node
         localAssignments[graph.StartNodeId] = spawnType;
 
         // 2. Find boss location: farthest node that satisfies boss constraints
-        var bossConstraints = constraints.Where(c => c.TargetRoomType.Equals(bossType)).ToList();
+        var bossConstraints = constraintsByType.TryGetValue(bossType, out var boss)
+            ? boss
+            : Array.Empty<IConstraint<TRoomType>>();
         var validBossNodes = graph.Nodes
             .Where(n => n.Id != graph.StartNodeId)
             .Where(n => bossConstraints.All(c => c.IsValid(n, graph, localAssignments)))
@@ -115,12 +122,14 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
 
         // 4. Assign required room types based on constraints
         // Process global requirements first
-        foreach (var (roomType, count) in roomRequirements.OrderByDescending(r => GetConstraintPriority(r.type, constraints)))
+        foreach (var (roomType, count) in roomRequirements.OrderByDescending(r => GetConstraintPriority(r.type, constraintsByType)))
         {
             if (roomType.Equals(spawnType) || roomType.Equals(bossType))
                 continue; // Already handled
 
-            var typeConstraints = constraints.Where(c => c.TargetRoomType.Equals(roomType)).ToList();
+            var typeConstraints = constraintsByType.TryGetValue(roomType, out var type)
+                ? type
+                : Array.Empty<IConstraint<TRoomType>>();
             int assigned = 0;
 
             var candidates = graph.Nodes
@@ -158,9 +167,11 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
             }
 
             // Process zone requirements ordered by constraint priority
-            foreach (var (roomType, count, zoneId) in zoneReqsWithZones.OrderByDescending(r => GetConstraintPriority(r.type, constraints)))
+            foreach (var (roomType, count, zoneId) in zoneReqsWithZones.OrderByDescending(r => GetConstraintPriority(r.type, constraintsByType)))
             {
-                var typeConstraints = constraints.Where(c => c.TargetRoomType.Equals(roomType)).ToList();
+                var typeConstraints = constraintsByType.TryGetValue(roomType, out var type)
+                    ? type
+                    : Array.Empty<IConstraint<TRoomType>>();
                 int assigned = 0;
 
                 // Only consider nodes in the specific zone
@@ -238,9 +249,11 @@ public sealed class RoomTypeAssigner<TRoomType> where TRoomType : Enum
         throw new InvalidOperationException("No path found - graph is disconnected");
     }
 
-    private int GetConstraintPriority(TRoomType roomType, IReadOnlyList<IConstraint<TRoomType>> constraints)
+    private int GetConstraintPriority(TRoomType roomType, IReadOnlyDictionary<TRoomType, IReadOnlyList<IConstraint<TRoomType>>> constraintsByType)
     {
-        var typeConstraints = constraints.Where(c => c.TargetRoomType.Equals(roomType)).ToList();
+        var typeConstraints = constraintsByType.TryGetValue(roomType, out var constraints)
+            ? constraints
+            : Array.Empty<IConstraint<TRoomType>>();
         
         // Higher priority = more specific constraints
         // Count constraint types to determine priority

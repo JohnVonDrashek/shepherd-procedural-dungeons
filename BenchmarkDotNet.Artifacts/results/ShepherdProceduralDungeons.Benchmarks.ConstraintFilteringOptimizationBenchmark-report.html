@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ShepherdProceduralDungeons.Benchmarks.ConstraintFilteringOptimizationBenchmark-20251212-122824</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.2 (24G325) [Darwin 24.6.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.100
+  [Host]     : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                        </th><th>nodeCount</th><th>constraintCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>RoomTypeAssignment</td><td>5</td><td>10</td><td>1,342.0 ns</td><td>25.81 ns</td><td>32.64 ns</td><td>?</td><td>?</td><td>0.8469</td><td>-</td><td>-</td><td>7088 B</td><td>?</td>
+</tr><tr><td>ConstraintFiltering</td><td>?</td><td>10</td><td>112.1 ns</td><td>1.29 ns</td><td>1.15 ns</td><td>1.00</td><td>0.00</td><td>0.0696</td><td>-</td><td>-</td><td>584 B</td><td>1.00</td>
+</tr><tr><td>PriorityCalculation</td><td>?</td><td>10</td><td>552.1 ns</td><td>8.87 ns</td><td>7.86 ns</td><td>4.92</td><td>0.08</td><td>0.3300</td><td>-</td><td>-</td><td>2760 B</td><td>4.73</td>
+</tr><tr><td>ConstraintFilteringMemoryAllocations</td><td>?</td><td>10</td><td>172,400.6 ns</td><td>1,332.02 ns</td><td>1,245.97 ns</td><td>1,538.47</td><td>18.21</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>7481 B</td><td>12.81</td>
+</tr><tr><td>RoomTypeAssignment</td><td>10</td><td>50</td><td>6,205.5 ns</td><td>107.65 ns</td><td>132.21 ns</td><td>?</td><td>?</td><td>3.2349</td><td>-</td><td>-</td><td>27096 B</td><td>?</td>
+</tr><tr><td>RoomTypeAssignment</td><td>20</td><td>100</td><td>11,716.8 ns</td><td>115.51 ns</td><td>102.40 ns</td><td>?</td><td>?</td><td>6.1646</td><td>-</td><td>-</td><td>51648 B</td><td>?</td>
+</tr><tr><td>ConstraintFiltering</td><td>?</td><td>50</td><td>590.9 ns</td><td>10.23 ns</td><td>9.07 ns</td><td>1.00</td><td>0.00</td><td>0.3109</td><td>-</td><td>-</td><td>2608 B</td><td>1.00</td>
+</tr><tr><td>PriorityCalculation</td><td>?</td><td>50</td><td>2,519.4 ns</td><td>39.02 ns</td><td>38.33 ns</td><td>4.27</td><td>0.10</td><td>1.2779</td><td>-</td><td>-</td><td>10713 B</td><td>4.11</td>
+</tr><tr><td>ConstraintFilteringMemoryAllocations</td><td>?</td><td>50</td><td>190,319.7 ns</td><td>2,939.08 ns</td><td>2,294.64 ns</td><td>323.02</td><td>5.10</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>28748 B</td><td>11.02</td>
+</tr><tr><td>ConstraintFiltering</td><td>?</td><td>100</td><td>1,150.1 ns</td><td>2.09 ns</td><td>1.74 ns</td><td>1.00</td><td>0.00</td><td>0.6065</td><td>-</td><td>-</td><td>5088 B</td><td>1.00</td>
+</tr><tr><td>PriorityCalculation</td><td>?</td><td>100</td><td>5,053.1 ns</td><td>16.06 ns</td><td>15.02 ns</td><td>4.39</td><td>0.02</td><td>2.4567</td><td>-</td><td>-</td><td>20587 B</td><td>4.05</td>
+</tr><tr><td>ConstraintFilteringMemoryAllocations</td><td>?</td><td>100</td><td>214,033.1 ns</td><td>4,132.87 ns</td><td>5,373.89 ns</td><td>184.59</td><td>5.48</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>53383 B</td><td>10.49</td>
+</tr></tbody></table>
+</body>
+</html>

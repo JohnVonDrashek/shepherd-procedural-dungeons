@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ShepherdProceduralDungeons.Benchmarks.SpatialPlacementBoundingBoxOptimizationBenchmark-20251212-121800</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, macOS 15.7.2 (24G325) [Darwin 24.6.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.100
+  [Host]     : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+  DefaultJob : .NET 10.0.0 (10.0.25.52411), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                    </th><th>placementAttempts</th><th>roomSize</th><th>Mean   </th><th>Error </th><th>StdDev</th><th>Median </th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>EndToEndSpatialPlacement</td><td>10</td><td>?</td><td>3,682.31 ns</td><td>11.025 ns</td><td>10.313 ns</td><td>3,685.87 ns</td><td>?</td><td>?</td><td>0.5913</td><td>-</td><td>-</td><td>4960 B</td><td>?</td>
+</tr><tr><td>EndToEndSpatialPlacement</td><td>25</td><td>?</td><td>8,910.28 ns</td><td>30.311 ns</td><td>26.870 ns</td><td>8,914.16 ns</td><td>?</td><td>?</td><td>1.4801</td><td>-</td><td>-</td><td>12400 B</td><td>?</td>
+</tr><tr><td>EndToEndSpatialPlacement</td><td>50</td><td>?</td><td>16,910.57 ns</td><td>97.803 ns</td><td>91.485 ns</td><td>16,921.20 ns</td><td>?</td><td>?</td><td>2.9602</td><td>-</td><td>-</td><td>24800 B</td><td>?</td>
+</tr><tr><td>BoundingBoxCalculation</td><td>?</td><td>large</td><td>1,121.64 ns</td><td>22.385 ns</td><td>36.779 ns</td><td>1,139.53 ns</td><td>1.00</td><td>0.00</td><td>0.1163</td><td>-</td><td>-</td><td>976 B</td><td>1.00</td>
+</tr><tr><td>SinglePassBoundingBoxCalculation</td><td>?</td><td>large</td><td>391.99 ns</td><td>4.434 ns</td><td>4.148 ns</td><td>392.05 ns</td><td>0.36</td><td>0.01</td><td>0.0191</td><td>-</td><td>-</td><td>160 B</td><td>0.16</td>
+</tr><tr><td>NearbyPlacement</td><td>?</td><td>large</td><td>11,627.03 ns</td><td>42.331 ns</td><td>39.596 ns</td><td>11,621.06 ns</td><td>10.64</td><td>0.43</td><td>1.1749</td><td>-</td><td>-</td><td>9864 B</td><td>10.11</td>
+</tr><tr><td>BoundingBoxMemoryAllocations</td><td>?</td><td>large</td><td>175,051.29 ns</td><td>2,743.962 ns</td><td>2,432.451 ns</td><td>174,958.80 ns</td><td>160.58</td><td>5.09</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>1987 B</td><td>2.04</td>
+</tr><tr><td>BoundingBoxCalculation</td><td>?</td><td>medium</td><td>276.07 ns</td><td>0.769 ns</td><td>0.642 ns</td><td>276.31 ns</td><td>1.00</td><td>0.00</td><td>0.0448</td><td>-</td><td>-</td><td>376 B</td><td>1.00</td>
+</tr><tr><td>SinglePassBoundingBoxCalculation</td><td>?</td><td>medium</td><td>121.53 ns</td><td>0.834 ns</td><td>0.780 ns</td><td>121.78 ns</td><td>0.44</td><td>0.00</td><td>0.0191</td><td>-</td><td>-</td><td>160 B</td><td>0.43</td>
+</tr><tr><td>NearbyPlacement</td><td>?</td><td>medium</td><td>3,176.08 ns</td><td>3.200 ns</td><td>2.836 ns</td><td>3,176.50 ns</td><td>11.50</td><td>0.02</td><td>0.5302</td><td>-</td><td>-</td><td>4464 B</td><td>11.87</td>
+</tr><tr><td>BoundingBoxMemoryAllocations</td><td>?</td><td>medium</td><td>180,831.70 ns</td><td>3,578.597 ns</td><td>5,245.461 ns</td><td>182,607.51 ns</td><td>639.29</td><td>15.89</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>1388 B</td><td>3.69</td>
+</tr><tr><td>BoundingBoxCalculation</td><td>?</td><td>small</td><td>130.39 ns</td><td>0.745 ns</td><td>0.622 ns</td><td>130.18 ns</td><td>1.00</td><td>0.00</td><td>0.0296</td><td>-</td><td>-</td><td>248 B</td><td>1.00</td>
+</tr><tr><td>SinglePassBoundingBoxCalculation</td><td>?</td><td>small</td><td>53.26 ns</td><td>0.104 ns</td><td>0.092 ns</td><td>53.26 ns</td><td>0.41</td><td>0.00</td><td>0.0191</td><td>-</td><td>-</td><td>160 B</td><td>0.65</td>
+</tr><tr><td>NearbyPlacement</td><td>?</td><td>small</td><td>1,282.85 ns</td><td>1.973 ns</td><td>1.845 ns</td><td>1,282.61 ns</td><td>9.84</td><td>0.05</td><td>0.3948</td><td>-</td><td>-</td><td>3312 B</td><td>13.35</td>
+</tr><tr><td>BoundingBoxMemoryAllocations</td><td>?</td><td>small</td><td>171,877.82 ns</td><td>427.494 ns</td><td>378.962 ns</td><td>171,915.82 ns</td><td>1,318.34</td><td>5.70</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>1257 B</td><td>5.07</td>
+</tr><tr><td>BoundingBoxCalculation</td><td>?</td><td>xlarge</td><td>4,035.18 ns</td><td>12.008 ns</td><td>10.645 ns</td><td>4,036.42 ns</td><td>1.00</td><td>0.00</td><td>0.3967</td><td>-</td><td>-</td><td>3376 B</td><td>1.00</td>
+</tr><tr><td>SinglePassBoundingBoxCalculation</td><td>?</td><td>xlarge</td><td>1,373.50 ns</td><td>14.296 ns</td><td>12.673 ns</td><td>1,372.35 ns</td><td>0.34</td><td>0.00</td><td>0.0191</td><td>-</td><td>-</td><td>160 B</td><td>0.05</td>
+</tr><tr><td>NearbyPlacement</td><td>?</td><td>xlarge</td><td>40,163.59 ns</td><td>167.742 ns</td><td>156.906 ns</td><td>40,189.59 ns</td><td>9.95</td><td>0.04</td><td>3.7231</td><td>-</td><td>-</td><td>31464 B</td><td>9.32</td>
+</tr><tr><td>BoundingBoxMemoryAllocations</td><td>?</td><td>xlarge</td><td>174,037.04 ns</td><td>408.428 ns</td><td>362.061 ns</td><td>174,044.69 ns</td><td>43.13</td><td>0.17</td><td>2000.0000</td><td>2000.0000</td><td>2000.0000</td><td>4408 B</td><td>1.31</td>
+</tr></tbody></table>
+</body>
+</html>

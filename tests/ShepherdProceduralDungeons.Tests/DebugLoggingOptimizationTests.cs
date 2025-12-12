@@ -191,7 +191,7 @@ public class DebugLoggingOptimizationTests
             
             // Flush and get output before disposing writer
             writer.Flush();
-            var outputText = writer.ToString();
+            var outputText = output.ToString();
             
             // Verify no VERBOSE output was generated (other log levels might have output from other code)
             Assert.DoesNotContain("[VERBOSE]", outputText);
