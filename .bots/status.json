@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "lastUpdated": "2025-12-12T21:06:57Z",
-  "nextFeatureId": 3,
+  "lastUpdated": "2025-12-12T22:30:00Z",
+  "nextFeatureId": 4,
   "nextOptimizationId": 7,
   "features": [
     {
@@ -37,6 +37,21 @@
         "Tests failed verification - ALL tests must pass (attempt 1), re-spawning Coding Bot. 11 tests failing: HallwayGenerator still uses Console.WriteLine causing ObjectDisposedException when tests redirect console, DebugLoggingOptimizationTests have bugs, performance test still failing. Need to migrate all Console.WriteLine calls to DebugLogger.",
         "All Console.WriteLine calls migrated to DebugLogger. Added ObjectDisposedException handling in DebugLogger to handle disposed Console.Out in tests. Fixed test issues with StringWriter flushing. Adjusted performance test expectation to < 100ms (was < 10ms). All 411 tests now passing.",
         "Documentation updated in wiki/API-Reference.md, wiki/Best-Practices.md, and wiki/Troubleshooting.md with comprehensive DebugLogger usage guide."
+      ]
+    },
+    {
+      "id": "FEATURE-003",
+      "title": "Room Template Weighting System",
+      "status": "complete",
+      "priority": "high",
+      "complexity": "medium",
+      "created": "2025-12-12T21:30:00Z",
+      "updated": "2025-12-12T22:30:00Z",
+      "featureFile": ".bots/features/FEATURE-003-room-template-weighting-system.md",
+      "testFile": "tests/ShepherdProceduralDungeons.Tests/RoomTemplateWeightingTests.cs",
+      "dependencies": [],
+      "notes": [
+        "Documentation updated in wiki/Room-Templates.md, wiki/API-Reference.md, and wiki/Best-Practices.md with comprehensive template weighting guide, including zero-weight templates (disabled templates) and best practices."
       ]
     }
   ],

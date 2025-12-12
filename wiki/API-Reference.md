@@ -206,7 +206,7 @@ public int Width { get; }
 public int Height { get; }
 ```
 
-**Weight**: Selection weight for this template. Higher weights increase selection probability. Default is 1.0 (uniform distribution when all templates have default weight). Must be greater than 0.
+**Weight**: Selection weight for this template. Higher weights increase selection probability. Default is 1.0 (uniform distribution when all templates have default weight). Must be >= 0.0. Zero weight disables the template (excludes it from selection).
 
 **InteriorFeatures**: Interior obstacles and features defined for this template, keyed by cell position (template-local coordinates). Default is an empty dictionary. Features must be placed in interior cells (not on exterior edges).
 
@@ -248,7 +248,7 @@ public RoomTemplateBuilder<TRoomType> AddInteriorFeature(int x, int y, InteriorF
 public RoomTemplate<TRoomType> Build()
 ```
 
-**WithWeight**: Sets the selection weight for this template. Weight must be greater than 0. Default is 1.0. Higher weights increase selection probability.
+**WithWeight**: Sets the selection weight for this template. Weight must be >= 0.0. Default is 1.0. Higher weights increase selection probability. Zero weight disables the template (excludes it from selection).
 
 **AddInteriorFeature**: Adds an interior feature at the specified cell position (template-local coordinates). The feature must be within the template's cell bounds and cannot be placed on exterior edges. Throws `InvalidConfigurationException` if placement is invalid.
 

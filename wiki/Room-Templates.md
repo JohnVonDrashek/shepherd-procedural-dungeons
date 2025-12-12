@@ -313,21 +313,53 @@ var templates = new List<RoomTemplate<RoomType>>
 };
 ```
 
-### Weight Validation
+### Zero-Weight Templates (Disabled Templates)
 
-Weights must be **positive numbers** (greater than 0). Zero or negative weights will throw `InvalidConfigurationException`:
+Templates with weight **0.0** are allowed and will be **excluded from selection**. This is useful for temporarily disabling templates without removing them from your configuration:
 
 ```csharp
-// ❌ Error: Weight must be greater than 0
+var templates = new List<RoomTemplate<RoomType>>
+{
+    // Active template
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-active")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(1.0)
+        .Build(),
+    
+    // Disabled template (won't be selected)
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-disabled")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.0)  // Disabled - excluded from selection
+        .Build()
+};
+```
+
+**Important:** If **all** templates for a room type have zero weight, generation will fail with `InvalidConfigurationException` because no templates can be selected.
+
+### Weight Validation
+
+Weights must be **non-negative numbers** (>= 0.0). Negative weights will throw `InvalidConfigurationException`:
+
+```csharp
+// ✅ Valid: Zero weight (disables template)
+RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+    .WithId("disabled")
+    .ForRoomTypes(RoomType.Combat)
+    .WithDoorsOnAllExteriorEdges()
+    .WithWeight(0.0)  // Valid - disables template
+    .Build();
+
+// ❌ Error: Weight must be >= 0
 RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
     .WithId("invalid")
     .ForRoomTypes(RoomType.Combat)
     .WithDoorsOnAllExteriorEdges()
-    .WithWeight(0.0)  // Invalid!
+    .WithWeight(-1.0)  // Invalid - negative weight
     .Build();
-
-// ❌ Error: Weight must be greater than 0
-.WithWeight(-1.0)  // Invalid!
 ```
 
 ### Determinism

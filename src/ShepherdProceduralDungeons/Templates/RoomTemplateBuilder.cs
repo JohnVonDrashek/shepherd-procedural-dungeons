@@ -192,7 +192,7 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
     /// <summary>
     /// Sets the selection weight for this template.
     /// </summary>
-    /// <param name="weight">Weight value (must be > 0). Default is 1.0.</param>
+    /// <param name="weight">Weight value (must be >= 0). Default is 1.0. Zero weight disables the template.</param>
     /// <returns>This builder for method chaining.</returns>
     public RoomTemplateBuilder<TRoomType> WithWeight(double weight)
     {
@@ -285,9 +285,9 @@ public sealed class RoomTemplateBuilder<TRoomType> where TRoomType : Enum
         if (_doorEdges.Count == 0)
             throw new InvalidConfigurationException($"Template '{_id}' must have at least one door edge");
 
-        // Validate weight
-        if (_weight <= 0)
-            throw new InvalidConfigurationException($"Template '{_id}' weight must be greater than 0, but was {_weight}");
+        // Validate weight (allow zero, but not negative)
+        if (_weight < 0)
+            throw new InvalidConfigurationException($"Template '{_id}' weight must be >= 0, but was {_weight}");
 
         // Validate door edges are on exterior edges
         foreach (var (cell, edges) in _doorEdges)

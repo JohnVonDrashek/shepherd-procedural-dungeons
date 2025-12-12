@@ -59,6 +59,87 @@ var combatTemplates = new[]
 };
 ```
 
+### Template Weighting
+
+Use weights to control template frequency and create game design mechanics:
+
+**Common vs Rare Templates:**
+```csharp
+var templates = new[]
+{
+    // Common template (appears frequently)
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-common")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(10.0)  // Very common
+        .Build(),
+    
+    // Rare special template (appears infrequently)
+    RoomTemplateBuilder<RoomType>.LShape(6, 5, 2, 2, Corner.TopRight)
+        .WithId("combat-legendary")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.1)  // Rare (1% chance)
+        .Build()
+};
+```
+
+**Size-Based Weighting:**
+```csharp
+// Small rooms more common, large rooms rare
+var templates = new[]
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(3, 3)
+        .WithId("combat-small")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(5.0)  // Most common
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-medium")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(2.0)  // Moderate
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(6, 6)
+        .WithId("combat-large")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.5)  // Rare
+        .Build()
+};
+```
+
+**Temporarily Disable Templates:**
+```csharp
+// Use zero weight to disable templates without removing them
+var templates = new[]
+{
+    RoomTemplateBuilder<RoomType>.Rectangle(4, 4)
+        .WithId("combat-active")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(1.0)
+        .Build(),
+    
+    RoomTemplateBuilder<RoomType>.Rectangle(5, 5)
+        .WithId("combat-disabled")
+        .ForRoomTypes(RoomType.Combat)
+        .WithDoorsOnAllExteriorEdges()
+        .WithWeight(0.0)  // Disabled - won't be selected
+        .Build()
+};
+```
+
+**Best Practices:**
+- Use relative weights (e.g., 10 vs 1 = 10x more likely) rather than absolute values
+- Keep weights simple (1.0, 2.0, 0.5) for easier probability calculation
+- Test weight distributions to ensure desired frequency
+- Remember: probability = template.Weight / sum(all_template_weights)
+
 ## Constraint Design
 
 ### Start Without Constraints

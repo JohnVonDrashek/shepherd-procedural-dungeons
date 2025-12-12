@@ -334,10 +334,14 @@ public sealed class IncrementalSolver<TRoomType> : ISpatialSolver<TRoomType> whe
         if (available.Count == 0)
             throw new InvalidConfigurationException($"No templates registered for room type {roomType} matching difficulty bounds");
 
+        // Filter out zero-weight templates (they are disabled)
+        available = available.Where(t => t.Weight > 0).ToList();
+
+        if (available.Count == 0)
+            throw new InvalidConfigurationException($"No templates with positive weight found for room type {roomType}. All templates have zero weight.");
+
         // Calculate total weight
         double totalWeight = available.Sum(t => t.Weight);
-        if (totalWeight <= 0)
-            throw new InvalidConfigurationException($"Total weight for room type {roomType} must be positive");
 
         // Weighted random selection (zone templates have higher effective weight)
         double randomValue = rng.NextDouble() * totalWeight;

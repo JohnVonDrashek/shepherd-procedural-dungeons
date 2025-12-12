@@ -6,7 +6,7 @@ using ShepherdProceduralDungeons.Templates;
 namespace ShepherdProceduralDungeons.Tests;
 
 /// <summary>
-/// Tests for FEATURE-001: Room Template Weighting
+/// Tests for FEATURE-003: Room Template Weighting System
 /// </summary>
 public class RoomTemplateWeightingTests
 {
@@ -219,21 +219,8 @@ public class RoomTemplateWeightingTests
             $"Dominant template selected {dominantCount} times ({dominantRatio:P}), expected >95%");
     }
 
-    [Fact]
-    public void RoomTemplateBuilder_ZeroWeight_ThrowsInvalidConfigurationException()
-    {
-        // Arrange & Act & Assert
-        Assert.Throws<InvalidConfigurationException>(() =>
-        {
-            RoomTemplateBuilder<TestHelpers.RoomType>
-                .Rectangle(3, 3)
-                .WithId("invalid")
-                .ForRoomTypes(TestHelpers.RoomType.Combat)
-                .WithDoorsOnAllExteriorEdges()
-                .WithWeight(0.0)
-                .Build();
-        });
-    }
+    // Note: Zero-weight templates should be allowed (not throw on Build)
+    // They are excluded from selection instead. See RoomTemplateBuilder_ZeroWeight_AllowsZeroWeight test.
 
     [Fact]
     public void RoomTemplateBuilder_NegativeWeight_ThrowsInvalidConfigurationException()
@@ -441,7 +428,387 @@ public class RoomTemplateWeightingTests
         if (method == null)
             throw new InvalidOperationException("SelectTemplate method not found");
 
-        return (RoomTemplate<TestHelpers.RoomType>)method.Invoke(solver, new object[] { roomType, templates, rng })!;
+        try
+        {
+            return (RoomTemplate<TestHelpers.RoomType>)method.Invoke(solver, new object[] { roomType, templates, rng })!;
+        }
+        catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException != null)
+        {
+            // Unwrap reflection exceptions
+            throw ex.InnerException;
+        }
+    }
+
+    [Fact]
+    public void RoomTemplateBuilder_ZeroWeight_AllowsZeroWeight()
+    {
+        // Arrange & Act - Zero weight should be allowed (not throw on Build)
+        // This differs from current implementation which throws on Build
+        var template = RoomTemplateBuilder<TestHelpers.RoomType>
+            .Rectangle(3, 3)
+            .WithId("disabled")
+            .ForRoomTypes(TestHelpers.RoomType.Combat)
+            .WithDoorsOnAllExteriorEdges()
+            .WithWeight(0.0)
+            .Build();
+
+        // Assert
+        Assert.Equal(0.0, template.Weight);
+    }
+
+    [Fact]
+    public void IncrementalSolver_ZeroWeightTemplate_ExcludesFromSelection()
+    {
+        // Arrange - Template with zero weight should be excluded from selection
+        var templates = new List<RoomTemplate<TestHelpers.RoomType>>
+        {
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("enabled")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1.0)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("disabled")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(0.0)  // Zero weight - should be excluded
+                .Build()
+        };
+
+        var templateDict = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, templates }
+        };
+
+        var rng = new Random(12345);
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+
+        // Act - Run many selections
+        const int iterations = 100;
+        for (int i = 0; i < iterations; i++)
+        {
+            var selected = SelectTemplateForTesting(solver, TestHelpers.RoomType.Combat, templateDict, rng);
+            // Assert - Zero-weight template should never be selected
+            Assert.NotEqual("disabled", selected.Id);
+            Assert.Equal("enabled", selected.Id);
+        }
+    }
+
+    [Fact]
+    public void IncrementalSolver_AllZeroWeights_ThrowsInvalidConfigurationException()
+    {
+        // Arrange - All templates have zero weight
+        var templates = new List<RoomTemplate<TestHelpers.RoomType>>
+        {
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("disabled1")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(0.0)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("disabled2")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(0.0)
+                .Build()
+        };
+
+        var templateDict = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, templates }
+        };
+
+        var rng = new Random(12345);
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+
+        // Act & Assert - Should throw with clear error message
+        var exception = Assert.Throws<InvalidConfigurationException>(() =>
+        {
+            SelectTemplateForTesting(solver, TestHelpers.RoomType.Combat, templateDict, rng);
+        });
+
+        Assert.Contains("room type", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("weight", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void IncrementalSolver_ZoneSpecificTemplates_RespectsWeights()
+    {
+        // Arrange - Zone-specific templates with different weights
+        var globalTemplate = RoomTemplateBuilder<TestHelpers.RoomType>
+            .Rectangle(3, 3)
+            .WithId("global")
+            .ForRoomTypes(TestHelpers.RoomType.Combat)
+            .WithDoorsOnAllExteriorEdges()
+            .WithWeight(1.0)
+            .Build();
+
+        var zoneCommonTemplate = RoomTemplateBuilder<TestHelpers.RoomType>
+            .Rectangle(4, 4)
+            .WithId("zone-common")
+            .ForRoomTypes(TestHelpers.RoomType.Combat)
+            .WithDoorsOnAllExteriorEdges()
+            .WithWeight(10.0)  // Much more likely in zone
+            .Build();
+
+        var zoneRareTemplate = RoomTemplateBuilder<TestHelpers.RoomType>
+            .Rectangle(5, 5)
+            .WithId("zone-rare")
+            .ForRoomTypes(TestHelpers.RoomType.Combat)
+            .WithDoorsOnAllExteriorEdges()
+            .WithWeight(0.1)  // Rare in zone
+            .Build();
+
+        var globalTemplates = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, new[] { globalTemplate } }
+        };
+
+        var zoneTemplates = new Dictionary<string, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { "test-zone", new[] { zoneCommonTemplate, zoneRareTemplate } }
+        };
+
+        var zoneAssignments = new Dictionary<int, string>
+        {
+            { 1, "test-zone" }
+        };
+
+        // Use reflection to set zone info and call SelectTemplate with zone parameters
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+        var setZoneInfoMethod = typeof(IncrementalSolver<TestHelpers.RoomType>).GetMethod(
+            "SetZoneInfo",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        setZoneInfoMethod?.Invoke(solver, new object[] { zoneAssignments, zoneTemplates });
+
+        // Get the 6-parameter SelectTemplate overload
+        var selectMethod = typeof(IncrementalSolver<TestHelpers.RoomType>).GetMethod(
+            "SelectTemplate",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+            null,
+            new Type[] 
+            { 
+                typeof(TestHelpers.RoomType), 
+                typeof(IReadOnlyDictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>), 
+                typeof(Random),
+                typeof(int?),
+                typeof(IReadOnlyDictionary<int, string>),
+                typeof(IReadOnlyDictionary<string, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>)
+            },
+            null);
+
+        if (selectMethod == null)
+            throw new InvalidOperationException("SelectTemplate method with zone parameters not found");
+
+        var rng = new Random(12345);
+
+        // Act - Run many selections for a node in the zone
+        var selections = new Dictionary<string, int>();
+        const int iterations = 1000;
+        for (int i = 0; i < iterations; i++)
+        {
+            try
+            {
+                var selected = (RoomTemplate<TestHelpers.RoomType>)selectMethod.Invoke(
+                    solver, 
+                    new object[] { TestHelpers.RoomType.Combat, globalTemplates, rng, 1, zoneAssignments, zoneTemplates })!;
+                selections.TryGetValue(selected.Id, out var count);
+                selections[selected.Id] = count + 1;
+            }
+            catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException != null)
+            {
+                // Unwrap reflection exceptions
+                throw ex.InnerException;
+            }
+        }
+
+        // Assert - Zone-common should appear much more often than zone-rare
+        var zoneCommonCount = selections.GetValueOrDefault("zone-common", 0);
+        var zoneRareCount = selections.GetValueOrDefault("zone-rare", 0);
+        var globalCount = selections.GetValueOrDefault("global", 0);
+
+        // Zone-common (weight 10) should dominate over zone-rare (weight 0.1) and global (weight 1.0)
+        // Expected ratio: zone-common ~90%, zone-rare ~1%, global ~9%
+        var zoneCommonRatio = zoneCommonCount / (double)iterations;
+        Assert.True(zoneCommonRatio >= 0.85 && zoneCommonRatio <= 0.95,
+            $"Zone-common template selected {zoneCommonCount} times ({zoneCommonRatio:P}), expected ~90%");
+
+        var zoneRareRatio = zoneRareCount / (double)iterations;
+        Assert.True(zoneRareRatio >= 0.0 && zoneRareRatio <= 0.05,
+            $"Zone-rare template selected {zoneRareCount} times ({zoneRareRatio:P}), expected ~1%");
+    }
+
+    [Fact]
+    public void IncrementalSolver_VeryLargeWeights_WorksCorrectly()
+    {
+        // Arrange - Templates with very large weights (e.g., 1e6)
+        var templates = new List<RoomTemplate<TestHelpers.RoomType>>
+        {
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("large1")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1e6)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("large2")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1e6)
+                .Build()
+        };
+
+        var templateDict = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, templates }
+        };
+
+        var rng = new Random(12345);
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+
+        // Act - Run many selections
+        var selections = new Dictionary<string, int>();
+        const int iterations = 1000;
+        for (int i = 0; i < iterations; i++)
+        {
+            var selected = SelectTemplateForTesting(solver, TestHelpers.RoomType.Combat, templateDict, rng);
+            selections.TryGetValue(selected.Id, out var count);
+            selections[selected.Id] = count + 1;
+        }
+
+        // Assert - Should select uniformly (both have same weight)
+        var expectedCount = iterations / 2.0;
+        foreach (var template in templates)
+        {
+            var actualCount = selections.GetValueOrDefault(template.Id, 0);
+            var ratio = actualCount / expectedCount;
+            Assert.True(ratio >= 0.9 && ratio <= 1.1,
+                $"Template {template.Id} selected {actualCount} times, expected ~{expectedCount}");
+        }
+    }
+
+    [Fact]
+    public void IncrementalSolver_VerySmallWeights_WorksCorrectly()
+    {
+        // Arrange - Templates with very small weights (e.g., 1e-6)
+        var templates = new List<RoomTemplate<TestHelpers.RoomType>>
+        {
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("small1")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1e-6)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("small2")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1e-6)
+                .Build()
+        };
+
+        var templateDict = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, templates }
+        };
+
+        var rng = new Random(12345);
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+
+        // Act - Run many selections
+        var selections = new Dictionary<string, int>();
+        const int iterations = 1000;
+        for (int i = 0; i < iterations; i++)
+        {
+            var selected = SelectTemplateForTesting(solver, TestHelpers.RoomType.Combat, templateDict, rng);
+            selections.TryGetValue(selected.Id, out var count);
+            selections[selected.Id] = count + 1;
+        }
+
+        // Assert - Should select uniformly (both have same weight)
+        var expectedCount = iterations / 2.0;
+        foreach (var template in templates)
+        {
+            var actualCount = selections.GetValueOrDefault(template.Id, 0);
+            var ratio = actualCount / expectedCount;
+            Assert.True(ratio >= 0.9 && ratio <= 1.1,
+                $"Template {template.Id} selected {actualCount} times, expected ~{expectedCount}");
+        }
+    }
+
+    [Fact]
+    public void IncrementalSolver_MixedWeightDistribution_RespectsRelativeWeights()
+    {
+        // Arrange - Mixed weights: 10, 1, 0.1 (should produce ~90.1%, 9.0%, 0.9%)
+        var templates = new List<RoomTemplate<TestHelpers.RoomType>>
+        {
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("common")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(10.0)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("default")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(1.0)
+                .Build(),
+            RoomTemplateBuilder<TestHelpers.RoomType>
+                .Rectangle(3, 3)
+                .WithId("rare")
+                .ForRoomTypes(TestHelpers.RoomType.Combat)
+                .WithDoorsOnAllExteriorEdges()
+                .WithWeight(0.1)
+                .Build()
+        };
+
+        var templateDict = new Dictionary<TestHelpers.RoomType, IReadOnlyList<RoomTemplate<TestHelpers.RoomType>>>
+        {
+            { TestHelpers.RoomType.Combat, templates }
+        };
+
+        var rng = new Random(12345);
+        var solver = new IncrementalSolver<TestHelpers.RoomType>();
+
+        // Act - Run many selections
+        var selections = new Dictionary<string, int>();
+        const int iterations = 10000;  // More iterations for better statistical accuracy
+        for (int i = 0; i < iterations; i++)
+        {
+            var selected = SelectTemplateForTesting(solver, TestHelpers.RoomType.Combat, templateDict, rng);
+            selections.TryGetValue(selected.Id, out var count);
+            selections[selected.Id] = count + 1;
+        }
+
+        // Assert - Check probabilities match expected distribution
+        // Expected: common = 10/11.1 ≈ 90.1%, default = 1/11.1 ≈ 9.0%, rare = 0.1/11.1 ≈ 0.9%
+        var commonCount = selections.GetValueOrDefault("common", 0);
+        var defaultCount = selections.GetValueOrDefault("default", 0);
+        var rareCount = selections.GetValueOrDefault("rare", 0);
+
+        var commonRatio = commonCount / (double)iterations;
+        var defaultRatio = defaultCount / (double)iterations;
+        var rareRatio = rareCount / (double)iterations;
+
+        Assert.True(commonRatio >= 0.88 && commonRatio <= 0.93,
+            $"Common template selected {commonCount} times ({commonRatio:P}), expected ~90.1%");
+        Assert.True(defaultRatio >= 0.07 && defaultRatio <= 0.11,
+            $"Default template selected {defaultCount} times ({defaultRatio:P}), expected ~9.0%");
+        Assert.True(rareRatio >= 0.005 && rareRatio <= 0.015,
+            $"Rare template selected {rareCount} times ({rareRatio:P}), expected ~0.9%");
     }
 }
 
